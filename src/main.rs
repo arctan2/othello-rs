@@ -1,15 +1,26 @@
-use crossterm::style::Color;
-use termin::window::{Window, WindowOperations};
-
 mod termin;
 
+use std::{io::{stdout}};
+use termin::{
+  crossterm_handler::CrosstermHandler,
+  elements::{Rectangle},
+  window::{Window}
+};
+
 fn main() {
-  let root: Window = termin::init_termin();
+  let handler = CrosstermHandler::new(stdout());
 
-  root.set_cell_bg(5, 5, Color::Cyan);
-  root.refresh();
+  let mut root_win = termin::Root(&handler);
 
-  root.getch();
+  let win1 = Window::default(&handler).size(20, 20);
+
+  push_windows!(root_win, win1);
+
+  win1.render();
   
-  termin::end_termin();
+  let el1 = Rectangle::default().size(0, 0).position(0, 0);
+
+  win1.draw_element(&el1);
+  win1.render_element(&el1);
+  win1.render();
 }

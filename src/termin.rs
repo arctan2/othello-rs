@@ -1,22 +1,18 @@
-use std::io::stdout;
-use crossterm::{
-  execute,
-  terminal::{
-    LeaveAlternateScreen, EnterAlternateScreen, size, enable_raw_mode, disable_raw_mode
-  }
-};
-use window::{Window, Coord};
-
+pub mod crossterm_handler;
 pub mod window;
+pub mod elements;
 
-pub fn init_termin() -> Window {
-  enable_raw_mode().unwrap();
-  execute!(stdout(), EnterAlternateScreen).unwrap();
-  let (w, h) = size().unwrap();
-  Window::new_with_coord(Coord::new(0, 0), Coord::new(w as i32, h as i32))
-}
+use crossterm::terminal;
+use self::window::Window;
+use self::crossterm_handler::CrosstermHandler;
 
-pub fn end_termin() {
-  disable_raw_mode().unwrap();
-  execute!(stdout(), LeaveAlternateScreen).unwrap();
+pub fn Root<'a, W: std::io::Write>(handler: &'a CrosstermHandler<W>) -> Window<'a, W> {
+  use std::process;
+  match terminal::size() {
+    Ok((w, h)) => Window::default(handler).size(w, h),
+    _ => {
+      println!("unable to get terminal size");
+      process::exit(1); 
+    }
+  }
 }

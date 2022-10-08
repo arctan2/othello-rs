@@ -1,87 +1,56 @@
-use std::io::{stdout, Write};
-use crossterm::{
-  queue,
-  cursor::{MoveTo},
-  style::{Print, Color, SetBackgroundColor, ResetColor},
-  terminal::{Clear, ClearType},
-  event::{read, Event, KeyCode}
-};
+use std::io::Write;
 
-#[derive(Copy, Clone)]
-pub struct Coord {
-  pub x: i32,
-  pub y: i32
+use crate::termin::CrosstermHandler;
+
+use super::elements::Element;
+
+pub struct Window<'a, W: Write> {
+  start: (u16, u16),
+  width: u16,
+  height: u16,
+  handler: &'a CrosstermHandler<W>,
+  sub_windows: Vec<Box<&'a Window<'a, W>>>
 }
 
-pub struct Window {
-  pub start: Coord,
-  pub height: i32,
-  pub width: i32
+#[macro_export]
+macro_rules! push_windows {
+  ($parent: ident, $($child:expr),*) => {
+    $(
+      $parent.push_window(&$child)
+    )*
+  };
 }
 
-impl Coord {
-  pub fn new(x: i32, y: i32) -> Coord {
-    Coord { x, y }
-  }
-}
-
-impl Window {
-  pub fn new_with_coord(coord_1: Coord, coord_2: Coord) -> Window {
-    Window {
-      start: coord_1,
-      height: coord_2.y - coord_1.y,
-      width: coord_2.x - coord_1.x,
-    }
+impl <'a, W: Write> Window<'a, W> {
+  pub fn default(handler: &'a CrosstermHandler<W>) -> Self {
+    Window { width: 0, height: 0, start: (0, 0), handler: handler, sub_windows: vec![] }
   }
 
-  #[allow(dead_code)]
-  pub fn new_with_dimen(start: Coord, height: i32, width: i32) -> Window {
-    Window { start, height, width }
-  }
-}
-
-pub trait WindowOperations {
-  fn move_cursor(&self, x: u16, y: u16);
-  fn print_string(&self, str: String);
-  fn print_str(&self, str: &str);
-  fn set_cell_bg(&self, x: u16, y: u16, color: Color);
-  fn getch(&self) -> KeyCode;
-  fn refresh(&self);
-  fn clear(&self);
-}
-
-impl WindowOperations for Window {
-  fn move_cursor(&self, x: u16, y: u16) {
-    queue!(stdout(), MoveTo(x, y)).unwrap();
+  pub fn new(handler: &'a CrosstermHandler<W>, width: u16, height: u16, start: (u16, u16)) -> Self {
+    Window { width, height, start, handler, sub_windows: vec![] }
   }
 
-  fn print_string(&self, str: String) {
-    queue!(stdout(), Print(str)).unwrap();
+  pub fn position(mut self, pos: (u16, u16)) -> Self {
+    self.start = pos;
+    self
   }
 
-  fn print_str(&self, str: &str) {
-    self.print_string(str.to_string());
+  pub fn size(mut self, width: u16, height: u16) -> Self {
+    self.width = width;
+    self.height = height;
+    self 
   }
 
-  fn set_cell_bg(&self, x: u16, y: u16, color: Color) {
-    queue!(stdout(), MoveTo(x, y), SetBackgroundColor(color), Print(" "), ResetColor).unwrap();
+  pub fn push_window(mut self, win: &'a Self) {
+    self.sub_windows.push(Box::new(win));
   }
 
-  fn clear(&self) {
-    queue!(stdout(), Clear(ClearType::All)).unwrap();
+  pub fn render(&self) {
   }
 
-  fn refresh(&self) {
-    stdout().flush().unwrap();
+  pub fn render_element(&self, el: &dyn Element) {
   }
 
-  fn getch(&self) -> KeyCode {
-    loop {
-      match read() {
-        Ok(Event::Key(event)) => { return event.code; }, 
-        Err(_) => panic!("oopsi"),
-        _ => continue
-      }
-    }
+  pub fn draw_element(&self, el: &dyn Element) {
   }
 }
