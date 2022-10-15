@@ -1,37 +1,40 @@
+use super::buffer::{
+  Buffer, Rect
+};
+
 pub trait Element {
-  fn draw(&self); 
+  fn draw(&self, buf: &mut Buffer); 
 }
 
 pub struct Rectangle {
-  x: u16,
-  y: u16,
-  width: u16,
-  height: u16,
+  rect: Rect
 }
 
 impl Rectangle {
-  pub fn new(width: u16, height: u16, x: u16, y: u16) -> Self {
-    Rectangle { x, y, width, height }
-  }
-
-  pub fn default() -> Self {
-    Rectangle { x: 0, y: 0, width: 0, height: 0 }
+  pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
+    Rectangle { rect: Rect::new(x, y, width, height) }
   }
 
   pub fn position(mut self, x: u16, y: u16) -> Self {
-    self.x = x;
-    self.y = y;
+    self.rect.x = x;
+    self.rect.y = y;
     self
   }
 
   pub fn size(mut self, width: u16, height: u16) -> Self {
-    self.width = width;
-    self.height = height;
+    self.rect.width = width;
+    self.rect.height = height;
     self
   }
 }
 
+impl Default for Rectangle {
+  fn default() -> Self {
+    Self::new(0, 0, 0, 0)
+  }
+}
+
 impl Element for Rectangle {
-  fn draw(&self) {
+  fn draw(&self, buf: &mut Buffer) {
   }
 }
