@@ -1,3 +1,5 @@
+use crossterm::style::Color;
+
 use super::buffer::{
   Buffer, Rect
 };
@@ -7,12 +9,13 @@ pub trait Element {
 }
 
 pub struct Rectangle {
-  rect: Rect
+  rect: Rect,
+  bg: Color
 }
 
 impl Rectangle {
   pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-    Rectangle { rect: Rect::new(x, y, width, height) }
+    Rectangle { rect: Rect::new(x, y, width, height), bg: Color::Reset }
   }
 
   pub fn position(mut self, x: u16, y: u16) -> Self {
@@ -26,6 +29,11 @@ impl Rectangle {
     self.rect.height = height;
     self
   }
+
+  pub fn bg(mut self, bg: Color) -> Self {
+    self.bg = bg;
+    self
+  }
 }
 
 impl Default for Rectangle {
@@ -36,5 +44,6 @@ impl Default for Rectangle {
 
 impl Element for Rectangle {
   fn draw(&self, buf: &mut Buffer) {
+    buf.set_bg(self.bg);
   }
 }
