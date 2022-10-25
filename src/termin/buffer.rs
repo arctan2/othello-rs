@@ -1,4 +1,4 @@
-use std::vec;
+use std::{vec, rc::Rc};
 
 use crossterm::style::{Color, Attribute};
 
@@ -80,10 +80,33 @@ impl Buffer {
     let a = rect.area() as usize;
     Buffer{ rect, contents: vec![Cell::default(); a] }
   }
+
+  pub fn contents(&mut self) -> &mut Vec<Cell> {
+    &mut self.contents
+  }
+
+  pub fn reset(&mut self) {
+    for c in &mut self.contents {
+      c.reset();
+    }
+  }
+
+  pub fn width(&self) -> u16 {
+    self.rect.width
+  }
+
+  pub fn height(&self) -> u16 {
+    self.rect.height
+  }
   
   pub fn filled(rect: Rect, fill: Cell) -> Buffer {
     let a = rect.area() as usize;
     Buffer { rect, contents: vec![fill.clone(); a] }
+  }
+
+  pub fn set_pos(&mut self, x: u16, y: u16) {
+    self.rect.x = x;
+    self.rect.y = y;
   }
 
   pub fn index_of(&self, x: u16, y: u16) -> usize {
@@ -126,11 +149,11 @@ impl Buffer {
     self.rect.x + self.rect.width
   }
 
-  pub fn to_iter(&self) -> Vec<(u16, u16, &Cell)> {
+  pub fn to_vec(&self) -> Vec<(u16, u16, &Cell)> {
     let mut result: Vec<(u16, u16, &Cell)> = vec![];
 
-    for y in self.top()..self.bottom() {
-      for x in self.left()..self.right() {
+    for y in 0..self.height() {
+      for x in 0..self.width() {
         result.push((x, y, self.get(x, y)));
       }
     }

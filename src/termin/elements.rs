@@ -34,6 +34,10 @@ impl Rectangle {
     self.bg = bg;
     self
   }
+
+  pub fn set_bg(&mut self, bg: Color) {
+    self.bg = bg;
+  }
 }
 
 impl Default for Rectangle {

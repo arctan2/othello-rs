@@ -18,14 +18,19 @@ fn main() {
   execute!(stdout(), EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let win1 = terminal.root.new_child(Window::default().size(5, 5).position(0, 0));
+  let mut win1 = terminal.root.new_child(Window::default().size(2, 1).position(0, 0));
   let el1 = Rectangle::default().size(0, 0).position(0, 0).bg(Color::Blue);
 
-  win1.borrow_mut().draw_element(&el1);
-  terminal.render(&win1.borrow());
-  terminal.flush().unwrap();
-
-  sleep(Duration::from_millis(10000));
+  for i in 1..=10 {
+    for j in 1..50 {
+      win1.draw_element(&el1);
+      terminal.render(&win1.inner());
+      terminal.flush().unwrap();
+      sleep(Duration::from_millis(10));
+      win1.update_pos(j, i);
+      terminal.clear();
+    }
+  }
 
   execute!(stdout(), LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
