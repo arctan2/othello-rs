@@ -1,4 +1,4 @@
-use std::{vec, rc::Rc};
+use std::{fmt, vec, rc::Rc};
 
 use crossterm::style::{Color, Attribute};
 
@@ -17,24 +17,20 @@ impl Default for Cell {
 }
 
 impl Cell {
-  pub fn set_bg(&mut self, bg: Color) -> &mut Cell {
+  pub fn set_bg(&mut self, bg: Color) {
     self.bg = bg;
-    self
   }
 
-  pub fn set_fg(&mut self, fg: Color) -> &mut Cell {
+  pub fn set_fg(&mut self, fg: Color) {
     self.fg = fg;
-    self
   }
 
-  pub fn set_symbol(&mut self, sym: char) -> &mut Cell {
+  pub fn set_symbol(&mut self, sym: char) {
     self.symbol = sym.to_string();
-    self
   }
 
-  pub fn set_style(&mut self, attr: Attribute) -> &mut Cell {
+  pub fn set_style(&mut self, attr: Attribute) {
     self.style = attr;
-    self
   }
 
   pub fn reset(&mut self) {
@@ -69,10 +65,15 @@ impl Default for Rect {
   }
 }
 
-#[derive(Debug)]
 pub struct Buffer {
   rect: Rect,
   contents: Vec<Cell>
+}
+
+impl fmt::Debug for Buffer {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Buffer{{rect: {:?}, contents: Vec<Cell, {}>}}", self.rect, self.contents.len())
+  }
 }
 
 impl Buffer {
@@ -81,8 +82,12 @@ impl Buffer {
     Buffer{ rect, contents: vec![Cell::default(); a] }
   }
 
-  pub fn contents(&mut self) -> &mut Vec<Cell> {
+  pub fn contents_mut(&mut self) -> &mut Vec<Cell> {
     &mut self.contents
+  }
+  
+  pub fn contents(&self) -> &Vec<Cell> {
+    &self.contents
   }
 
   pub fn reset(&mut self) {

@@ -6,7 +6,7 @@ pub mod terminal_window;
 
 use crossterm::terminal;
 use self::terminal_window::Terminal;
-use self::window::{Window, WindowRef};
+use self::window::Window;
 use self::crossterm_handler::CrosstermHandler;
 
 pub fn root<W: std::io::Write>(handler: CrosstermHandler<W>) -> Terminal<W> {

@@ -38,6 +38,16 @@ impl Rectangle {
   pub fn set_bg(&mut self, bg: Color) {
     self.bg = bg;
   }
+
+  pub fn set_pos(&mut self, x: u16, y: u16) {
+    self.rect.x = x;
+    self.rect.y = y;
+  }
+
+  pub fn set_size(&mut self, width: u16, height: u16) {
+    self.rect.width = width;
+    self.rect.height = height;
+  }
 }
 
 impl Default for Rectangle {
@@ -48,6 +58,11 @@ impl Default for Rectangle {
 
 impl Element for Rectangle {
   fn draw(&self, buf: &mut Buffer) {
-    buf.set_bg(self.bg);
+    for y in 0..self.rect.height {
+      for x in 0..self.rect.width {
+        let c = buf.get_mut(self.rect.x + x, self.rect.y + y);
+        c.set_bg(self.bg);
+      }
+    }
   }
 }

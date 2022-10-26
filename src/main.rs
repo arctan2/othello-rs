@@ -18,17 +18,26 @@ fn main() {
   execute!(stdout(), EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().size(2, 1).position(0, 0));
-  let el1 = Rectangle::default().size(0, 0).position(0, 0).bg(Color::Blue);
+  let mut win1 = terminal.root.new_child(Window::default().size(60, 10).position(0, 0));
+  let mut el1 = Rectangle::default().size(2, 1).position(0, 0).bg(Color::Blue);
+  let mut colo = Color::Red;
 
-  for i in 1..=10 {
-    for j in 1..50 {
+  for y in 0..10 {
+    for x in 0..10 {
+      el1.set_bg(colo);
       win1.draw_element(&el1);
       terminal.render(&win1.inner());
       terminal.flush().unwrap();
-      sleep(Duration::from_millis(10));
-      win1.update_pos(j, i);
-      terminal.clear();
+      sleep(Duration::from_millis(100));
+      el1.set_pos(x, y);
+
+      colo = if colo == Color::Red {
+        Color::Blue
+      } else {
+        Color:: Red
+      };
+      
+      win1.clear();
     }
   }
 

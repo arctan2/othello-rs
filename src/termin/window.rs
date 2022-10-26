@@ -1,4 +1,4 @@
-use std::{rc::Rc, cell::{RefCell, RefMut, Ref}};
+use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}};
 
 use super::{
   elements::Element,
@@ -8,10 +8,19 @@ use super::{
 pub struct Window {
   buffer: Buffer,
   sub_windows: Vec<WinRef>,
-  parent: Option<WinRef>
+  parent: Option<WindowRef>
 }
 
 type WinRef = Rc<RefCell<Window>>;
+
+impl fmt::Debug for Window {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Window {{\n  parent: {}, \n  buffer: {:#?}\n}}", match self.parent {
+      None => "None",
+      _ => "<WindowRef>"
+    }, self.buffer())
+  }
+}
 
 impl Window {
   pub fn default() -> Self {
@@ -35,7 +44,7 @@ impl Window {
     self
   }
 
-  pub fn parent(mut self, parent: WinRef) -> Self {
+  pub fn parent(mut self, parent: WindowRef) -> Self {
     self.parent.replace(parent);
     self
   }
@@ -56,9 +65,14 @@ impl Window {
   pub fn buffer_mut(&mut self) -> &mut Buffer {
     &mut self.buffer
   }
+
+  pub fn clear(&mut self) {
+    self.buffer.reset();
+  }
 }
 
 
+#[derive(Clone, Debug)]
 pub struct WindowRef(pub WinRef);
 
 impl WindowRef {
@@ -82,7 +96,7 @@ impl WindowRef {
     let child = WindowRef(
       Rc::new(
         RefCell::new(
-          win.parent(self.0.clone())
+          win.parent(self.clone())
         )
       )
     );
@@ -95,7 +109,7 @@ impl WindowRef {
     self.0.borrow_mut()
   }
   
-  pub fn inner(&mut self) -> Ref<'_, Window> {
+  pub fn inner(&self) -> Ref<'_, Window> {
     self.0.borrow()
   }
 
@@ -106,5 +120,13 @@ impl WindowRef {
   pub fn draw_element(&mut self, el: &dyn Element) {
     self.inner_mut().draw_element(el);
   }
-}
 
+  pub fn clear(&mut self) {
+    self.inner_mut().clear();
+  } 
+
+  pub fn parent(&self) -> Option<WindowRef> {
+    let win = self.inner();
+    win.parent.clone()
+  }
+}
