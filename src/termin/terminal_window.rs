@@ -1,4 +1,4 @@
-use std::{io::{self, Write}};
+use std::io::{self, Write};
 
 use super::{crossterm_handler::CrosstermHandler, window::{Window, WindowRef}};
 
@@ -12,12 +12,39 @@ impl <W: Write> Terminal<W> {
     Terminal { handler, root: WindowRef::from_window(root) }
   }
 
-  pub fn render(&mut self, win: &Window) {
+  pub fn render(&mut self, win: &WindowRef) {
+    let win = win.inner();
     let buf = win.buffer();
+
+    /*
+    This line must be above the self.root.inner_mut() as root contains the win
+    and will error that "already mutably borrowed: BorrowError"
+    because we can't have immutable(win) varible be used after mutable(root)
+
+    here's the structure
+
+    Terminal {
+      root: {
+        sub_windows: [win]
+      }
+    }
+
+    Terminal {
+      root: {
+      ^^^^^ we are taking this as mutable
+        sub_windows: [win]
+                      ^^^ but this is immut and can't be used after root is borrowed "mutably"
+      }
+    }
+
+    And why does the Rc-RefCell deep check stuff??
+    Like how does it know that win is inside root??
+    
+    I hope future me won't waste time on this again.
+    */
+    let (top, left) = win.abs_pos();
     let mut a = self.root.inner_mut();
     let root_buf = a.buffer_mut(); 
-    let top = buf.top();
-    let left = buf.left();
 
     for y in 0..buf.height() {
       for x in 0..buf.width() {

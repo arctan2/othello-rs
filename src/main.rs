@@ -1,7 +1,7 @@
 mod termin;
 
 use std::time::Duration;
-use std::thread::sleep;
+use std::thread;
 use std::io::stdout;
 use termin::{
   crossterm_handler::CrosstermHandler,
@@ -13,33 +13,28 @@ use crossterm::{
   execute, style::Color, cursor
 };
 
+fn sleep(ms: u64) {
+  thread::sleep(Duration::from_millis(ms));
+}
+
 fn main() {
   enable_raw_mode().unwrap();
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().size(60, 10).position(0, 0));
-  let mut el1 = Rectangle::default().size(2, 1).position(0, 0).bg(Color::Blue);
-  let mut colo = Color::Red;
+  let mut win1 = terminal.root.new_child(Window::default().size(60, 10).position(5, 5));
+  let mut win2 = win1.new_child(Window::default().size(10, 5).position(0, 0));
+  let el1 = Rectangle::default()
+              .size(win2.get_width(), win2.get_height())
+              .position(0, 0)
+              .bg(Color::Blue);
 
-  for y in 0..10 {
-    for x in 0..10 {
-      el1.set_bg(colo);
-      win1.draw_element(&el1);
-      terminal.render(&win1.inner());
-      terminal.flush().unwrap();
-      sleep(Duration::from_millis(100));
-      el1.set_pos(x, y);
+  win2.draw_element(&el1);
 
-      colo = if colo == Color::Red {
-        Color::Blue
-      } else {
-        Color:: Red
-      };
-      
-      win1.clear();
-    }
-  }
+  terminal.render(&win2);
+  win2.clear();
+
+  sleep(3000);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();

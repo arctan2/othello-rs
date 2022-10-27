@@ -49,6 +49,10 @@ impl Window {
     self
   }
 
+  pub fn get_parent(&self) -> Option<WindowRef> {
+    self.parent.clone()
+  }
+
   pub fn size(mut self, width: u16, height: u16) -> Self {
     self.buffer = Buffer::empty(Rect::new(self.buffer.left(), self.buffer.top(), width, height));
     self 
@@ -68,6 +72,24 @@ impl Window {
 
   pub fn clear(&mut self) {
     self.buffer.reset();
+  }
+
+  pub fn abs_pos(&self) -> (u16, u16) {
+    let mut top = self.buffer.top();
+    let mut left = self.buffer.left();
+
+    let mut parent = self.get_parent();
+
+    loop {
+      match parent {
+        Some(p) => {
+          top += p.top();
+          left += p.left();
+          parent = p.parent();
+        },
+        None => { return (top, left) }
+      }
+    }
   }
 }
 
@@ -125,8 +147,35 @@ impl WindowRef {
     self.inner_mut().clear();
   } 
 
+  pub fn get_width(&self) -> u16 {
+    self.inner().buffer.width()
+  }
+
+  pub fn get_height(&self) -> u16 {
+    self.inner().buffer.height()
+  }
+
+  pub fn top(&self) -> u16 {
+    self.inner().buffer.top()
+  }
+  
+  pub fn left(&self) -> u16 {
+    self.inner().buffer.left()
+  }
+
+  pub fn bottom(&self) -> u16 {
+    self.inner().buffer.bottom()
+  }
+
+  pub fn right(&self) -> u16 {
+    self.inner().buffer.right()
+  }
+
   pub fn parent(&self) -> Option<WindowRef> {
-    let win = self.inner();
-    win.parent.clone()
+    self.inner().get_parent()
+  }
+
+  pub fn abs_pos(&self) -> (u16, u16) {
+    self.inner().abs_pos()
   }
 }
