@@ -35,7 +35,7 @@ impl Window {
     }
   }
 
-  pub fn update_pos(&mut self, x: u16, y: u16) {
+  pub fn set_pos(&mut self, x: u16, y: u16) {
     self.buffer.set_pos(x, y);
   }
 
@@ -135,8 +135,8 @@ impl WindowRef {
     self.0.borrow()
   }
 
-  pub fn update_pos(&mut self, x: u16, y: u16) {
-    self.inner_mut().update_pos(x, y);
+  pub fn set_pos(&mut self, x: u16, y: u16) {
+    self.inner_mut().set_pos(x, y);
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {

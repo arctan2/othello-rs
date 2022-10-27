@@ -67,31 +67,31 @@ impl Default for Rect {
 
 pub struct Buffer {
   rect: Rect,
-  contents: Vec<Cell>
+  content: Vec<Cell>
 }
 
 impl fmt::Debug for Buffer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Buffer{{rect: {:?}, contents: Vec<Cell, {}>}}", self.rect, self.contents.len())
+    write!(f, "Buffer{{rect: {:?}, content: Vec<Cell, {}>}}", self.rect, self.content.len())
   }
 }
 
 impl Buffer {
   pub fn empty(rect: Rect) -> Self {
     let a = rect.area() as usize;
-    Buffer{ rect, contents: vec![Cell::default(); a] }
+    Buffer{ rect, content: vec![Cell::default(); a] }
   }
 
-  pub fn contents_mut(&mut self) -> &mut Vec<Cell> {
-    &mut self.contents
+  pub fn content_mut(&mut self) -> &mut Vec<Cell> {
+    &mut self.content
   }
   
-  pub fn contents(&self) -> &Vec<Cell> {
-    &self.contents
+  pub fn content(&self) -> &Vec<Cell> {
+    &self.content
   }
 
   pub fn reset(&mut self) {
-    for c in &mut self.contents {
+    for c in &mut self.content {
       c.reset();
     }
   }
@@ -106,7 +106,7 @@ impl Buffer {
   
   pub fn filled(rect: Rect, fill: Cell) -> Buffer {
     let a = rect.area() as usize;
-    Buffer { rect, contents: vec![fill.clone(); a] }
+    Buffer { rect, content: vec![fill.clone(); a] }
   }
 
   pub fn set_pos(&mut self, x: u16, y: u16) {
@@ -119,21 +119,21 @@ impl Buffer {
   }
 
   pub fn size(&self) -> usize {
-    self.contents.len()
+    self.content.len()
   }
 
   pub fn get(&self, x: u16, y: u16) -> &Cell {
     let idx = self.index_of(x, y);
-    &self.contents[idx]
+    &self.content[idx]
   }
 
   pub fn get_mut(&mut self, x: u16, y: u16) -> &mut Cell {
     let idx = self.index_of(x, y);
-    &mut self.contents[idx]
+    &mut self.content[idx]
   }
 
   pub fn set_bg(&mut self, bg: Color) {
-    for c in &mut self.contents {
+    for c in &mut self.content {
       c.set_bg(bg);
     }
   }

@@ -22,19 +22,20 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().size(60, 10).position(5, 5));
-  let mut win2 = win1.new_child(Window::default().size(10, 5).position(0, 0));
+  let mut win1 = terminal.root.new_child(Window::default().size(10, 5).position(0, 0));
   let el1 = Rectangle::default()
-              .size(win2.get_width(), win2.get_height())
+              .size(win1.get_width(), win1.get_height())
               .position(0, 0)
               .bg(Color::Blue);
 
-  win2.draw_element(&el1);
-
-  terminal.render(&win2);
-  win2.clear();
-
-  sleep(3000);
+  for i in 0..180 {
+    win1.set_pos(i, 0);
+    win1.draw_element(&el1);
+    terminal.clear();
+    terminal.render(&win1);
+    terminal.flush().unwrap();
+    sleep(1);
+  }
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();

@@ -44,10 +44,25 @@ impl <W: Write> Terminal<W> {
     */
     let (top, left) = win.abs_pos();
     let mut a = self.root.inner_mut();
-    let root_buf = a.buffer_mut(); 
+    let root_buf = a.buffer_mut();
 
-    for y in 0..buf.height() {
-      for x in 0..buf.width() {
+    let (maxx, maxy) = (root_buf.right(), root_buf.bottom());
+    let mut endx = buf.width() as i16;
+    let mut endy = buf.height() as i16;
+    
+    if left + buf.width() > maxx {
+      endx -= ((left + buf.width()) - maxx) as i16;
+    }
+    if top + buf.height() > maxy {
+      endy -= ((top + buf.height()) - maxy) as i16;
+    }
+
+    if endx < 0 || endy < 0 {
+      return;
+    }
+
+    for y in 0..(endy as u16) {
+      for x in 0..(endx as u16) {
         let a = root_buf.get_mut(x + left, y + top);
         let b = buf.get(x, y);
         a.bg = b.bg;
@@ -56,8 +71,6 @@ impl <W: Write> Terminal<W> {
         a.symbol = b.symbol.clone();
       }
     }
-
-    self.handler.draw(root_buf.to_vec().into_iter()).unwrap();
   }
 
   pub fn clear(&mut self) {
@@ -65,6 +78,10 @@ impl <W: Write> Terminal<W> {
   }
 
   pub fn flush(&mut self) -> io::Result<()> {
+    match self.handler.draw(self.root.inner().buffer().to_vec().into_iter()) {
+      Ok(()) => (),
+      Err(_) => panic!("error while drawing the buffer")
+    }
     self.handler.flush()
   }
 }
