@@ -34,7 +34,7 @@ impl <W: Write> Terminal<W> {
   }
 
   pub fn clear(&mut self) {
-    self.root.0.borrow_mut().buffer_mut().reset();
+    self.root.inner_mut().buffer_mut().reset();
   }
 
   pub fn flush(&mut self) -> io::Result<()> {

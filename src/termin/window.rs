@@ -73,7 +73,7 @@ impl Window {
 
 
 #[derive(Clone, Debug)]
-pub struct WindowRef(pub WinRef);
+pub struct WindowRef(WinRef);
 
 impl WindowRef {
   pub fn default() -> Self {

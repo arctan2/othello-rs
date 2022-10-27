@@ -6,16 +6,16 @@ use std::io::stdout;
 use termin::{
   crossterm_handler::CrosstermHandler,
   elements::Rectangle,
-  window::Window
+  window::Window,
 };
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  execute, style::Color
+  execute, style::Color, cursor
 };
 
 fn main() {
   enable_raw_mode().unwrap();
-  execute!(stdout(), EnterAlternateScreen).unwrap();
+  execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
   let mut win1 = terminal.root.new_child(Window::default().size(60, 10).position(0, 0));
@@ -41,6 +41,6 @@ fn main() {
     }
   }
 
-  execute!(stdout(), LeaveAlternateScreen).unwrap();
+  execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
 }
