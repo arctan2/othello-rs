@@ -5,8 +5,9 @@ use std::thread;
 use std::io::stdout;
 use termin::{
   crossterm_handler::CrosstermHandler,
-  elements::Rectangle,
+  elements::{Rectangle, Text},
   window::Window,
+  terminal_window::render_windows
 };
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -23,19 +24,15 @@ fn main() {
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
   let mut win1 = terminal.root.new_child(Window::default().size(10, 5).position(0, 0));
-  let el1 = Rectangle::default()
-              .size(win1.get_width(), win1.get_height())
-              .position(0, 0)
-              .bg(Color::Blue);
+  let text = Text::default().size(10, 5).text("ysadsadjaskdjaskdajsdkaeyeyeye").fg(Color::White).bg(Color::Red);
 
-  for i in 0..180 {
-    win1.set_pos(i, 0);
-    win1.draw_element(&el1);
-    terminal.clear();
-    terminal.render(&win1);
-    terminal.flush().unwrap();
-    sleep(1);
-  }
+  win1.draw_element(&text);
+
+  terminal.render_all(&win1);
+
+  terminal.flush().unwrap();
+
+  sleep(2000);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();

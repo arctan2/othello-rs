@@ -73,6 +73,20 @@ impl <W: Write> Terminal<W> {
     }
   }
 
+  pub fn render_children(&mut self, win: &WindowRef) {
+    let w = win.inner();
+    let children = w.children();
+    
+    for child in children {
+      self.render(child);
+    }
+  }
+
+  pub fn render_all(&mut self, win: &WindowRef) {
+    self.render(win);
+    self.render_children(win);
+  }
+
   pub fn clear(&mut self) {
     self.root.inner_mut().buffer_mut().reset();
   }
@@ -85,3 +99,11 @@ impl <W: Write> Terminal<W> {
     self.handler.flush()
   }
 }
+
+macro_rules! render_windows {
+  ($terminal:ident, $($win:ident),+) => {
+    $($terminal.render(&$win);)+
+  }
+}
+
+pub(crate) use render_windows;

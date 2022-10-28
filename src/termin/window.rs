@@ -7,7 +7,7 @@ use super::{
 
 pub struct Window {
   buffer: Buffer,
-  sub_windows: Vec<WinRef>,
+  sub_windows: Vec<WindowRef>,
   parent: Option<WindowRef>
 }
 
@@ -74,6 +74,10 @@ impl Window {
     self.buffer.reset();
   }
 
+  pub fn children(&self) -> &Vec<WindowRef> {
+    &self.sub_windows
+  }
+
   pub fn abs_pos(&self) -> (u16, u16) {
     let mut top = self.buffer.top();
     let mut left = self.buffer.left();
@@ -123,7 +127,7 @@ impl WindowRef {
       )
     );
 
-    self.0.borrow_mut().sub_windows.push(child.0.clone());
+    self.0.borrow_mut().sub_windows.push(child.clone());
     child
   }
 
