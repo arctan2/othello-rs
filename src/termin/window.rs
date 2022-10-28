@@ -182,4 +182,73 @@ impl WindowRef {
   pub fn abs_pos(&self) -> (u16, u16) {
     self.inner().abs_pos()
   }
+
+  fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {
+    let mut a = self.inner_mut();
+    let self_buf_mut = a.buffer_mut();
+
+    let (maxx, maxy) = (self_buf_mut.right(), self_buf_mut.bottom());
+    let mut endx = buf.width() as i16;
+    let mut endy = buf.height() as i16;
+    
+    if left + buf.width() > maxx {
+      endx -= ((left + buf.width()) - maxx) as i16;
+    }
+    if top + buf.height() > maxy {
+      endy -= ((top + buf.height()) - maxy) as i16;
+    }
+
+    if endx < 0 || endy < 0 {
+      return;
+    }
+
+    for y in 0..(endy as u16) {
+      for x in 0..(endx as u16) {
+        let a = self_buf_mut.get_mut(x + left, y + top);
+        let b = buf.get(x, y);
+        a.bg = b.bg;
+        a.fg = b.fg;
+        a.style = b.style;
+        a.symbol = b.symbol.clone();
+      }
+    }
+  }
+
+  pub fn render_window(&mut self, win: &WindowRef) {
+    let win = win.inner();
+    let buf = win.buffer();
+
+    let (top, left) = win.abs_pos();
+    self.render_window_at(buf, top, left);
+  }
+
+  pub fn render_to_parent(&mut self) {
+    match self.parent() {
+      Some(mut parent) => parent.render_window(&self),
+      None => panic!("cannot call window.render_to_parent() on root window.")
+    }
+  }
+
+  pub fn render(&mut self) {
+    let mut parent = self.parent();
+    let w = self.inner();
+    let buf = w.buffer();
+    let mut top = buf.top();
+    let mut left = buf.left();
+
+    loop {
+      match parent {
+        Some(mut p) => {
+          parent = p.parent();
+          if parent.is_none() {
+            p.render_window_at(&buf, top, left);
+            return;
+          }
+          top += p.top();
+          left += p.left();
+        },
+        None => panic!("cannot call window.render() on root window, instead call terminal.flush().")
+      }
+    }
+  }
 }

@@ -12,78 +12,23 @@ impl <W: Write> Terminal<W> {
     Terminal { handler, root: WindowRef::from_window(root) }
   }
 
-  pub fn render(&mut self, win: &WindowRef) {
-    let win = win.inner();
-    let buf = win.buffer();
-
-    /*
-    This line must be above the self.root.inner_mut() as root contains the win
-    and will error that "already mutably borrowed: BorrowError"
-    because we can't have immutable(win) varible be used after mutable(root)
-
-    here's the structure
-
-    Terminal {
-      root: {
-        sub_windows: [win]
-      }
-    }
-
-    Terminal {
-      root: {
-      ^^^^^ we are taking this as mutable
-        sub_windows: [win]
-                      ^^^ but this is immut and can't be used after root is borrowed "mutably"
-      }
-    }
-
-    And why does the Rc-RefCell deep check stuff??
-    Like how does it know that win is inside root??
-    
-    I hope future me won't waste time on this again.
-    */
-    let (top, left) = win.abs_pos();
-    let mut a = self.root.inner_mut();
-    let root_buf = a.buffer_mut();
-
-    let (maxx, maxy) = (root_buf.right(), root_buf.bottom());
-    let mut endx = buf.width() as i16;
-    let mut endy = buf.height() as i16;
-    
-    if left + buf.width() > maxx {
-      endx -= ((left + buf.width()) - maxx) as i16;
-    }
-    if top + buf.height() > maxy {
-      endy -= ((top + buf.height()) - maxy) as i16;
-    }
-
-    if endx < 0 || endy < 0 {
-      return;
-    }
-
-    for y in 0..(endy as u16) {
-      for x in 0..(endx as u16) {
-        let a = root_buf.get_mut(x + left, y + top);
-        let b = buf.get(x, y);
-        a.bg = b.bg;
-        a.fg = b.fg;
-        a.style = b.style;
-        a.symbol = b.symbol.clone();
-      }
-    }
+  pub fn render_window(&mut self, win: &WindowRef) {
+    self.root.render_window(win);
   }
 
+  // can be optimised
   pub fn render_children(&mut self, win: &WindowRef) {
     let w = win.inner();
     let children = w.children();
     
     for child in children {
-      self.render(child);
+      self.render_window(child);
     }
   }
 
+  // can be optimised
   pub fn render_all(&mut self, win: &WindowRef) {
-    self.render(win);
+    self.render_window(win);
     self.render_children(win);
   }
 
@@ -107,3 +52,25 @@ macro_rules! render_windows {
 }
 
 pub(crate) use render_windows;
+    /*
+    This line must be above the self.inner_mut() as parent contains the win
+    and will error that "already mutably borrowed: BorrowError"
+    because we can't have immutable(win) varible be used after mutable(root)
+
+    here's the structure
+
+    parent: {
+      sub_windows: [win]
+    }
+
+    parent: {
+    ^^^^^ we are taking this as mutable
+      sub_windows: [win]
+                    ^^^ but this is immut and can't be used after parent is borrowed "mutably"
+    }
+
+    And why does the Rc-RefCell deep check stuff??
+    Like how does it know that win is inside root??
+    
+    I hope future me won't waste time on this again.
+    */

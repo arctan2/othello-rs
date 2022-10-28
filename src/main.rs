@@ -7,7 +7,6 @@ use termin::{
   crossterm_handler::CrosstermHandler,
   elements::{Rectangle, Text},
   window::Window,
-  terminal_window::render_windows
 };
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -23,10 +22,13 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().size(10, 5).position(0, 0));
-  let text = Text::default().size(10, 5).text("ysadsadjaskdjaskdajsdkaeyeyeye").fg(Color::White).bg(Color::Red);
+  let mut win1 = terminal.root.new_child(Window::default().size(20, 10).position(5, 5));
+  let mut win2 = win1.new_child(Window::default().size(10, 5).position(1, 1));
+  let text = Text::default().size(10, 5).text("hehe noi").fg(Color::Red).bg(Color::DarkBlue);
+  let rect = Rectangle::default().size(win1.get_width(), win1.get_height()).bg(Color::Red);
 
-  win1.draw_element(&text);
+  win1.draw_element(&rect);
+  win2.draw_element(&text);
 
   terminal.render_all(&win1);
 
