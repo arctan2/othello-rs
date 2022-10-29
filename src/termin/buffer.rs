@@ -1,4 +1,4 @@
-use std::{fmt, vec, rc::Rc};
+use std::{fmt, vec};
 
 use crossterm::style::{Color, Attribute};
 
