@@ -27,10 +27,8 @@ fn main() {
   let text = Text::default().size(10, 5).text("hehe noi").fg(Color::Red).bg(Color::DarkBlue);
   let rect = Rectangle::default().size(win1.get_width(), win1.get_height()).bg(Color::Red);
 
-  win1.draw_element(&rect);
-  win2.draw_element(&text);
-
-  terminal.render_all(&win1);
+  win1.render_element(&rect);
+  win2.render_element(&text);
 
   terminal.flush().unwrap();
 

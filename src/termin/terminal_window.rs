@@ -12,26 +12,6 @@ impl <W: Write> Terminal<W> {
     Terminal { handler, root: WindowRef::from_window(root) }
   }
 
-  pub fn render_window(&mut self, win: &WindowRef) {
-    self.root.render_window(win);
-  }
-
-  // can be optimised
-  pub fn render_children(&mut self, win: &WindowRef) {
-    let w = win.inner();
-    let children = w.children();
-    
-    for child in children {
-      self.render_window(child);
-    }
-  }
-
-  // can be optimised
-  pub fn render_all(&mut self, win: &WindowRef) {
-    self.render_window(win);
-    self.render_children(win);
-  }
-
   pub fn clear(&mut self) {
     self.root.inner_mut().buffer_mut().reset();
   }

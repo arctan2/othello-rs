@@ -74,8 +74,8 @@ impl Window {
     self.buffer.reset();
   }
 
-  pub fn children(&self) -> &Vec<WindowRef> {
-    &self.sub_windows
+  pub fn children(&self) -> Vec<WindowRef> {
+    self.sub_windows.clone()
   }
 
   pub fn abs_pos(&self) -> (u16, u16) {
@@ -94,6 +94,10 @@ impl Window {
         None => { return (top, left) }
       }
     }
+  }
+
+  pub fn rel_pos(&self) -> (u16, u16) {
+    (self.buffer.top(), self.buffer.left())
   }
 }
 
@@ -218,7 +222,7 @@ impl WindowRef {
     let win = win.inner();
     let buf = win.buffer();
 
-    let (top, left) = win.abs_pos();
+    let (top, left) = win.rel_pos();
     self.render_window_at(buf, top, left);
   }
 
@@ -250,5 +254,44 @@ impl WindowRef {
         None => panic!("cannot call window.render() on root window, instead call terminal.flush().")
       }
     }
+  }
+
+  pub fn is_root(&self) -> bool {
+    match self.parent() {
+      Some(_) => false,
+      None => true
+    }
+  }
+
+  // can be optimized
+  pub fn render_children(&mut self) {
+    let children = self.inner_mut().children();
+
+    if !self.is_root() {
+      self.render();
+    }
+
+    for mut child in children {
+      child.render();
+    }
+  }
+
+  // can be optimized
+  pub fn render_deep(&mut self) {
+    let children = self.inner_mut().children();
+
+    if !self.is_root() {
+      self.render();
+    }
+
+    for mut child in children {
+      child.render();
+      child.render_deep();
+    }
+  }
+
+  pub fn render_element(&mut self, el: &dyn Element) {
+    self.draw_element(el);
+    self.render();
   }
 }
