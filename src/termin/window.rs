@@ -1,8 +1,8 @@
-use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}};
+use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}, io::Write};
 
 use super::{
-  elements::Element,
-  buffer::{Rect, Buffer}
+  elements::{Element, InputBox},
+  buffer::{Rect, Buffer}, crossterm_handler::CrosstermHandler
 };
 
 pub struct Window {
@@ -293,5 +293,9 @@ impl WindowRef {
   pub fn render_element(&mut self, el: &dyn Element) {
     self.draw_element(el);
     self.render();
+  }
+
+  pub fn read_string<W: Write>(&mut self, input_box: &mut InputBox, handler: &mut CrosstermHandler<W>) -> String {
+    input_box.read_string(self, handler)
   }
 }

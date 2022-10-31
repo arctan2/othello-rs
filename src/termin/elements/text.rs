@@ -25,11 +25,36 @@ impl Text {
 
   pub fn text(mut self, text: &str) -> Self {
     self.text = text.to_string();
+    if self.rect.width == 0 {
+      self.rect.width = text.len() as u16;
+    }
+    if self.rect.height == 0 {
+      self.rect.height = 1;
+    }
     self
   }
 
   pub fn set_text(&mut self, text: &str) {
     self.text = text.to_string();
+  }
+
+  pub fn push_string(&mut self, s: String) {
+    self.text.push_str(&s);
+  }
+
+  pub fn add_char_at(&mut self, idx: usize, ch: char) {
+    self.text.insert(idx, ch)
+  }
+
+  pub fn remove_char_at(&mut self, idx: usize) {
+    if self.text.len() == 0 {
+      return;
+    }
+    self.text.remove(idx);
+  }
+
+  pub fn get_text(&self) -> &str {
+    &self.text
   }
 }
 
@@ -53,7 +78,7 @@ impl Element for Text {
 
         match text.next() {
           Some(sym) => c.set_symbol(sym),
-          None => ()
+          None => c.set_symbol(' ')
         }
       }
     }

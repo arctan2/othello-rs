@@ -5,12 +5,13 @@ use std::thread;
 use std::io::stdout;
 use termin::{
   crossterm_handler::CrosstermHandler,
-  elements::{Rectangle, Text},
+  elements::{Rectangle, Text, InputBox},
   window::Window,
 };
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  execute, style::Color, cursor
+  event::{Event, KeyCode},
+  execute, style::Color, cursor::{self, position}
 };
 
 fn sleep(ms: u64) {
@@ -22,17 +23,15 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().size(20, 10).position(5, 5));
-  let mut win2 = win1.new_child(Window::default().size(10, 5).position(1, 1));
-  let text = Text::default().size(10, 5).text("hehe noi").fg(Color::Red).bg(Color::DarkBlue);
-  let rect = Rectangle::default().size(win1.get_width(), win1.get_height()).bg(Color::Red);
+  let mut win1 = terminal.root.new_child(Window::default().position(0, 0).size(50, 20));
 
-  win1.render_element(&rect);
-  win2.render_element(&text);
+  terminal.handle_input(|handler| {
+    let placeholder = Text::default().text("nope: ");
+    let mut input_box = InputBox::default().size(30, 3).position(placeholder.get_text().len() as u16, 0);
+    win1.draw_element(&placeholder);
+    let s = win1.read_string(&mut input_box, handler);
+  });
 
-  terminal.flush().unwrap();
-
-  sleep(2000);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();

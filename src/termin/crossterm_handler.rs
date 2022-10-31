@@ -3,8 +3,10 @@ use crate::termin::buffer::Cell;
 use crossterm::{
   queue,
   style::{Print, SetAttribute, SetBackgroundColor, SetForegroundColor, Color, Attribute},
-  cursor::{MoveTo},
+  cursor::MoveTo, event::{read, Event}
 };
+
+use super::{window::WindowRef, elements::Element};
 
 pub struct CrosstermHandler <W: Write> {
   buffer: W
@@ -68,6 +70,14 @@ where W: Write {
 
     Ok(())
   }
+
+  pub fn draw_window(&mut self, win: &WindowRef) -> io::Result<()> {
+    self.draw(win.inner().buffer().to_vec().into_iter())
+  }
+
+  pub fn getch(&self) -> Result<Event, std::io::Error> {
+    read()
+  } 
 
   pub fn flush(&mut self) -> io::Result<()> {
     self.buffer.flush()

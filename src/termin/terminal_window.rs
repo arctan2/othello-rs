@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use crossterm::event::{read, Event};
 
 use super::{crossterm_handler::CrosstermHandler, window::{Window, WindowRef}};
 
@@ -16,11 +17,33 @@ impl <W: Write> Terminal<W> {
     self.root.inner_mut().buffer_mut().reset();
   }
 
-  pub fn flush(&mut self) -> io::Result<()> {
+  pub fn getch(&self) -> Result<Event, std::io::Error> {
+    self.handler.getch()
+  }
+
+  pub fn refresh(&mut self) -> io::Result<()> {
     match self.handler.draw(self.root.inner().buffer().to_vec().into_iter()) {
       Ok(()) => (),
       Err(_) => panic!("error while drawing the buffer")
     }
+    self.flush()
+  }
+
+  pub fn draw_window(&mut self, win: &WindowRef) {
+    match self.handler.draw(win.inner().buffer().to_vec().into_iter()) {
+      Ok(()) => (),
+      Err(_) => panic!("error while drawing the buffer")
+    }
+  }
+
+  pub fn handle_input<F>(&mut self, func: F)
+  where
+    F: FnOnce(&mut CrosstermHandler<W>)
+  {
+    func(&mut self.handler);
+  }
+
+  pub fn flush(&mut self) -> io::Result<()> {
     self.handler.flush()
   }
 }
