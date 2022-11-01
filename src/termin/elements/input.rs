@@ -28,6 +28,11 @@ impl InputBox {
     self
   }
 
+  pub fn start_text(mut self, start_text: (u16, u16)) -> Self {
+    self.input_box = self.input_box.start_text(start_text);
+    self
+  }
+
   pub fn read_string<W: Write>(&mut self, win: &mut WindowRef, handler: &mut CrosstermHandler<W>) -> String {
     let mut cursor_pos: usize = 0;
     handler.draw_window(&win).unwrap();

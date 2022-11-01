@@ -5,13 +5,20 @@ pub struct Text {
   rect: Rect,
   bg: Color,
   fg: Color,
-  text: String
+  text: String,
+  start_text: (u16, u16)
 }
 
 #[allow(dead_code)]
 impl Text {
   pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-    Self { rect: Rect::new(x, y, width, height), bg: Color::Reset, fg: Color::Reset, text: String::from("") }
+    Self {
+      rect: Rect::new(x, y, width, height),
+      bg: Color::Reset,
+      fg: Color::Reset,
+      text: String::from(""),
+      start_text: (0, 0)
+    }
   }
 
   pub fn fg(mut self, fg: Color) -> Self {
@@ -32,6 +39,15 @@ impl Text {
       self.rect.height = 1;
     }
     self
+  }
+
+  pub fn start_text(mut self, start_text: (u16, u16)) -> Self {
+    self.start_text = start_text;
+    self
+  }
+
+  pub fn set_start_text(&mut self, start_text: (u16, u16)) {
+    self.start_text = start_text
   }
 
   pub fn set_text(&mut self, text: &str) {
@@ -69,17 +85,38 @@ impl Default for Text {
 impl Element for Text {
   fn draw(&self, buf: &mut Buffer) {
     let mut text = self.text.chars();
+    let (start_x, start_y) = self.start_text;
 
-    for y in 0..self.rect.height {
+    for y in 0..start_y {
       for x in 0..self.rect.width {
         let c = buf.get_mut(self.rect.x + x, self.rect.y + y);
         c.set_bg(self.bg);
-        c.set_fg(self.fg);
+      }
+    }
 
-        match text.next() {
-          Some(sym) => c.set_symbol(sym),
-          None => c.set_symbol(' ')
-        }
+    for x in 0..start_x {
+      let c = buf.get_mut(self.rect.x + x, self.rect.y + start_y);
+      c.set_bg(self.bg);
+    }
+
+    let mut set_cell = |x, y| {
+      let c = buf.get_mut(x, y);
+      c.set_bg(self.bg);
+      c.set_fg(self.fg);
+
+      match text.next() {
+        Some(sym) => c.set_symbol(sym),
+        None => c.set_symbol(' ')
+      }
+    };
+
+    for x in start_x..self.rect.width {
+      set_cell(self.rect.x + x, self.rect.y + start_y);
+    }
+
+    for y in start_y + 1..self.rect.height {
+      for x in 0..self.rect.width {
+        set_cell(self.rect.x + x, self.rect.y + y);
       }
     }
   }

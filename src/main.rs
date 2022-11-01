@@ -11,7 +11,7 @@ use termin::{
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
   event::{Event, KeyCode},
-  execute, style::Color, cursor::{self, position}
+  execute, style::Color, cursor
 };
 
 fn sleep(ms: u64) {
@@ -27,7 +27,7 @@ fn main() {
 
   terminal.handle_input(|handler| {
     let placeholder = Text::default().text("nope: ");
-    let mut input_box = InputBox::default().size(30, 3).position(placeholder.get_text().len() as u16, 0);
+    let mut input_box = InputBox::default().size(30, 3).start_text((placeholder.get_text().len() as u16, 0));
     win1.draw_element(&placeholder);
     let s = win1.read_string(&mut input_box, handler);
   });
