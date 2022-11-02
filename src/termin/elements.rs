@@ -17,7 +17,7 @@ pub use input::{InputBox};
 macro_rules! impl_setters {
   ($struct_name:ident) => {
     impl $struct_name {
-      fn position(mut self, x: u16, y: u16) -> Self {
+      pub fn position(mut self, x: u16, y: u16) -> Self {
         self.rect.x = x;
         self.rect.y = y;
         self

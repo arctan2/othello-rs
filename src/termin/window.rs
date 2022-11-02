@@ -1,5 +1,7 @@
 use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}, io::Write};
 
+use crossterm::style::Color;
+
 use super::{
   elements::{Element, InputBox},
   buffer::{Rect, Buffer}, crossterm_handler::CrosstermHandler
@@ -49,6 +51,11 @@ impl Window {
     self
   }
 
+  pub fn bg(mut self, bg: Color) -> Self {
+    self.buffer.set_bg(bg);
+    self
+  }
+
   pub fn get_parent(&self) -> Option<WindowRef> {
     self.parent.clone()
   }
@@ -68,6 +75,10 @@ impl Window {
 
   pub fn buffer_mut(&mut self) -> &mut Buffer {
     &mut self.buffer
+  }
+
+  pub fn set_bg(&mut self, bg: Color) {
+    self.buffer.set_bg(bg);
   }
 
   pub fn clear(&mut self) {
@@ -187,6 +198,10 @@ impl WindowRef {
     self.inner().abs_pos()
   }
 
+  pub fn set_bg(&mut self, bg: Color) {
+    self.inner_mut().set_bg(bg);
+  }
+
   fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {
     let mut a = self.inner_mut();
     let self_buf_mut = a.buffer_mut();
@@ -210,10 +225,14 @@ impl WindowRef {
       for x in 0..(endx as u16) {
         let a = self_buf_mut.get_mut(x + left, y + top);
         let b = buf.get(x, y);
-        a.bg = b.bg;
+        if b.bg != Color::Reset {
+          a.bg = b.bg;
+        }
         a.fg = b.fg;
         a.style = b.style;
-        a.symbol = b.symbol.clone();
+        if b.symbol != " " {
+          a.symbol = b.symbol.clone();
+        } 
       }
     }
   }

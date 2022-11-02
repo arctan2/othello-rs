@@ -3,6 +3,7 @@ use super::{
   Buffer, Rect, Element, impl_setters
 };
 
+#[derive(Debug)]
 pub struct Rectangle {
   rect: Rect,
   bg: Color

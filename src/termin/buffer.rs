@@ -66,6 +66,7 @@ impl Default for Rect {
 }
 
 pub struct Buffer {
+  bg: Color,
   rect: Rect,
   content: Vec<Cell>
 }
@@ -79,7 +80,7 @@ impl fmt::Debug for Buffer {
 impl Buffer {
   pub fn empty(rect: Rect) -> Self {
     let a = rect.area() as usize;
-    Buffer{ rect, content: vec![Cell::default(); a] }
+    Buffer{ rect, content: vec![Cell::default(); a], bg: Color::Reset }
   }
 
   pub fn content_mut(&mut self) -> &mut Vec<Cell> {
@@ -106,7 +107,7 @@ impl Buffer {
   
   pub fn filled(rect: Rect, fill: Cell) -> Buffer {
     let a = rect.area() as usize;
-    Buffer { rect, content: vec![fill.clone(); a] }
+    Buffer { rect, content: vec![fill.clone(); a], bg: Color::Reset }
   }
 
   pub fn set_pos(&mut self, x: u16, y: u16) {
@@ -133,9 +134,16 @@ impl Buffer {
   }
 
   pub fn set_bg(&mut self, bg: Color) {
+    self.bg = bg;
     for c in &mut self.content {
-      c.set_bg(bg);
+      if c.bg == Color::Reset {
+        c.set_bg(bg);
+      }
     }
+  }
+
+  pub fn get_bg(&self) -> Color {
+    self.bg
   }
 
   pub fn top(&self) -> u16 {

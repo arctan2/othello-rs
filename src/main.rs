@@ -1,17 +1,17 @@
 mod termin;
+mod game;
 
 use std::time::Duration;
 use std::thread;
 use std::io::stdout;
-use termin::{
-  crossterm_handler::CrosstermHandler,
-  elements::{Rectangle, Text, InputBox},
-  window::Window,
-};
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  event::{Event, KeyCode},
-  execute, style::Color, cursor
+  execute, cursor, style::Color
+};
+use game::Game;
+use termin::{
+  crossterm_handler::CrosstermHandler,
+  window::Window, elements::Rectangle
 };
 
 fn sleep(ms: u64) {
@@ -23,15 +23,25 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let mut win1 = terminal.root.new_child(Window::default().position(0, 0).size(50, 20));
+  let (width, height) = (32 - 2, 15);
+  let mut board_container = terminal.root.new_child(
+    Window::default().size(width + 4, height + 2).bg(Color::Green)
+  );
+  let mut board = board_container.new_child(Window::default().size(32 - 2, 15).position(2, 1));
 
-  terminal.handle_input(|handler| {
-    let placeholder = Text::default().text("nope: ");
-    let mut input_box = InputBox::default().size(30, 3).start_text((placeholder.get_text().len() as u16, 0));
-    win1.draw_element(&placeholder);
-    let s = win1.read_string(&mut input_box, handler);
-  });
+  let mut game = Game::default();
 
+  game.init_board();
+
+  game.board.print_board(board.clone());
+
+  board.render_to_parent();
+
+  terminal.draw_window(&board_container);
+
+  terminal.flush().unwrap();
+
+  sleep(5000);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
