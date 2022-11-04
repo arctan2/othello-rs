@@ -14,6 +14,15 @@ impl Rectangle {
   pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
     Rectangle { rect: Rect::new(x, y, width, height), bg: Color::Reset }
   }
+
+  pub fn bg(mut self, bg: Color) -> Self {
+    self.bg = bg;
+    self
+  }
+
+  pub fn set_bg(&mut self, bg: Color) {
+    self.bg = bg;
+  }
 }
 
 impl_setters!(Rectangle);

@@ -94,6 +94,7 @@ impl Buffer {
   pub fn reset(&mut self) {
     for c in &mut self.content {
       c.reset();
+      c.set_bg(self.bg);
     }
   }
 

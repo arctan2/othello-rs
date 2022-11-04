@@ -23,23 +23,22 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let (width, height) = (32 - 2, 15);
-  let mut board_container = terminal.root.new_child(
-    Window::default().size(width + 4, height + 2).bg(Color::Green)
-  );
-  let mut board = board_container.new_child(Window::default().size(32 - 2, 15).position(2, 1));
 
-  let mut game = Game::default();
+  let mut game = Game::new(terminal.root.clone());
 
   game.init_board();
+  game.board.render();
+  terminal.refresh().unwrap();
 
-  game.board.print_board(board.clone());
-
-  board.render_to_parent();
-
-  terminal.draw_window(&board_container);
-
-  terminal.flush().unwrap();
+  for y in 0..8 {
+    for x in 0..8 {
+      terminal.clear();
+      game.board.move_cursor(x, y);
+      game.board.render();
+      terminal.refresh().unwrap();
+      sleep(1000);
+    } 
+  }
 
   sleep(5000);
 

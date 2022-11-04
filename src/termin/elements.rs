@@ -29,15 +29,6 @@ macro_rules! impl_setters {
         self
       }
 
-      pub fn bg(mut self, bg: Color) -> Self {
-        self.bg = bg;
-        self
-      }
-
-      pub fn set_bg(&mut self, bg: Color) {
-        self.bg = bg;
-      }
-
       pub fn set_pos(&mut self, x: u16, y: u16) {
         self.rect.x = x;
         self.rect.y = y;

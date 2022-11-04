@@ -1,6 +1,6 @@
 use crossterm::style::Color;
 
-use crate::termin::{window::WindowRef, elements::Rectangle};
+use crate::termin::{window::WindowRef, elements::{Rectangle, Text}};
 
 pub const BLACK: char = 'b';
 pub const WHITE: char = 'w';
@@ -13,8 +13,17 @@ const fix: i8 = 0;
 
 type Side = char;
 
+struct Cursor {
+	x: u16,
+	y: u16,
+	el: Rectangle
+}
+
 pub struct Board {
-  pub board: [[Side; 8]; 8]
+  pub board: [[Side; 8]; 8],
+  pub board_container: WindowRef,
+  pub board_win: WindowRef,
+  cursor: Cursor
 }
 
 const TRAV_ARR: [[i8; 2]; 8] = [
@@ -28,18 +37,21 @@ const TRAV_ARR: [[i8; 2]; 8] = [
 	[down, right],
 ];
 
-impl Default for Board {
-  fn default() -> Self {
-    Self { board: [['0'; 8]; 8] }
-  }
-}
-
 impl Board {
-  pub fn isInBounds(&self, row: i8, col: i8, row_len: i8, col_len: i8) -> bool {
+  pub fn new(board_container: WindowRef, board_win: WindowRef) -> Self {
+    Self { 
+      board: [['0'; 8]; 8],
+      board_container, board_win,
+      cursor: Cursor { x: 0, y: 0, el: Rectangle::default().bg(Color::Yellow).size(2, 1) }
+    }
+  }
+
+  pub fn is_in_bounds(&self, row: i8, col: i8, row_len: i8, col_len: i8) -> bool {
     row >= 0 && row < row_len && col >= 0 && col < col_len
   }
 
-  pub fn print_board(&self, mut win: WindowRef) {
+  pub fn render(&mut self) {
+    self.board_container.clear();
     let mut pos_x = 0;
     let mut pos_y = 0;
     let mut cell = Rectangle::default().size(2, 1).position(pos_x, pos_y).bg(Color::Green);
@@ -56,74 +68,90 @@ impl Board {
           Color::Rgb { r: 80, g: 220, b: 120 }
         });
 
-        win.draw_element(&cell);
+        self.board_win.draw_element(&cell);
 
         pos_x += 4;
       }
       pos_y += 2;
     }
+
+    self.board_win.render_to_parent();
+    self.render_cursor();
+    self.board_container.render();
   }
 
-  pub fn traverseFrom(&self, initRow: i8, initCol: i8, vDir: i8, hDir: i8, mySide: Side, opponentSide: Side) -> bool  {
-    let mut row = initRow + vDir;
-    let mut col = initCol + hDir;
+  pub fn render_cursor(&mut self) {
+    let x = self.cursor.x * 4 + 2;
+    let y = self.cursor.y * 2 + 1;
+    self.cursor.el.set_pos(x, y);
+    self.board_container.draw_element(&self.cursor.el);
+  }
+
+  pub fn move_cursor(&mut self, x: u16, y: u16) {
+    self.cursor.x = x;
+    self.cursor.y = y;
+  }
+
+  pub fn traverse_from(&self, init_row: i8, init_col: i8, v_dir: i8, h_dir: i8, my_side: Side, opponent_side: Side) -> bool  {
+    let mut row = init_row + v_dir;
+    let mut col = init_col + h_dir;
     let (rl, cl) = (self.board.len() as i8, self.board[0].len() as i8);
 
-    while self.isInBounds(row, col, rl, cl) && (self.board[row as usize][col as usize] == opponentSide) {
-      row += vDir;
-      col += hDir;
+    while self.is_in_bounds(row, col, rl, cl) && (self.board[row as usize][col as usize] == opponent_side) {
+      row += v_dir;
+      col += h_dir;
     }
 
-    if !self.isInBounds(row, col, rl, cl) {
-      row += vDir * -1;
-      col += hDir * -1;
+    if !self.is_in_bounds(row, col, rl, cl) {
+      row += v_dir * -1;
+      col += h_dir * -1;
     }
 
-    if self.board[row as usize][col as usize] == mySide && (col != initCol+hDir || row != initRow+vDir) {
+    if self.board[row as usize][col as usize] == my_side && (col != init_col+h_dir || row != init_row+v_dir) {
       return true;
     }
 
     return false;
   }
 
-  pub fn flipFrom(&mut self, initRow: i8, initCol: i8, vDir: i8, hDir: i8, flipFrom: Side, flipTo: Side) {
-    let mut row = initRow + vDir;
-    let mut col = initCol + hDir;
+  pub fn flip_from(&mut self, init_row: i8, init_col: i8, v_dir: i8, h_dir: i8, flip_from: Side, flip_to: Side) {
+    let mut row = init_row + v_dir;
+    let mut col = init_col + h_dir;
     let (rl, cl) = (self.board.len() as i8, self.board[0].len() as i8);
 
-    while self.isInBounds(row, col, rl, cl) && (self.board[row as usize][col as usize] == flipFrom) {
-      self.board[row as usize][col as usize] = flipTo;
-      row += vDir;
-      col += hDir;
+    while self.is_in_bounds(row, col, rl, cl) && (self.board[row as usize][col as usize] == flip_from) {
+      self.board[row as usize][col as usize] = flip_to;
+      row += v_dir;
+      col += h_dir;
     }
   }
 
-  pub fn traverseAndFlip(&mut self, i: i8, j: i8, mySide: Side, opponentSide: Side) -> bool {
+  pub fn traverse_and_flip(&mut self, i: i8, j: i8, my_side: Side, opponent_side: Side) -> bool {
     let mut isFlipped = false;
 
     for d in TRAV_ARR {
-      let f = self.traverseFrom(i, j, d[0], d[1], mySide, opponentSide);
+      let f = self.traverse_from(i, j, d[0], d[1], my_side, opponent_side);
       if f {
-        self.flipFrom(i, j, d[0], d[1], opponentSide, mySide);
+        self.flip_from(i, j, d[0], d[1], opponent_side, my_side);
       }
       isFlipped = f || isFlipped;
     }
 
     if isFlipped {
-      self.board[i as usize][j as usize] = mySide;
+      self.board[i as usize][j as usize] = my_side;
     }
 
     return isFlipped;
   }
 
-  pub fn hasPossibleMoves(&mut self, mySide: Side, opponentSide: Side) -> bool {
+  pub fn has_possible_moves(&mut self, my_side: Side, opponent_side: Side) -> bool {
     for i in 0..self.board.len() {
       for j in 0..self.board[i].len() {
-        if self.board[i][j] != mySide {
+        if self.board[i][j] != my_side {
           continue;
         }
         for d in TRAV_ARR {
-          if self.traverseFrom(i as i8, j as i8, d[0], d[1], '0', opponentSide) {
+          if self.traverse_from(i as i8, j as i8, d[0], d[1], '0', opponent_side) {
             return true;
           }
         }
@@ -132,7 +160,7 @@ impl Board {
     return false;
   }
 
-  pub fn getPointsFor(&self, s: Side) -> i8 {
+  pub fn get_points_for(&self, s: Side) -> i8 {
     let mut p = 0;
 
     for row in self.board {
