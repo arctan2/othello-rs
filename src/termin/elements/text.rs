@@ -85,16 +85,6 @@ impl Element for Text {
     let mut text = self.text.chars();
     let (start_x, start_y) = self.start_text;
 
-    for y in 0..start_y {
-      for x in 0..self.rect.width {
-        let c = buf.get_mut(self.rect.x + x, self.rect.y + y);
-      }
-    }
-
-    for x in 0..start_x {
-      let c = buf.get_mut(self.rect.x + x, self.rect.y + start_y);
-    }
-
     let mut set_cell = |x, y| {
       let c = buf.get_mut(x, y);
       c.set_fg(self.fg);

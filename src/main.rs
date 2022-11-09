@@ -1,5 +1,6 @@
 mod termin;
 mod game;
+mod menu;
 
 use std::time::Duration;
 use std::thread;
@@ -9,6 +10,7 @@ use crossterm::{
   execute, cursor, style::Color
 };
 use game::Game;
+use menu::Menu;
 use termin::{
   crossterm_handler::CrosstermHandler,
   window::Window, elements::Rectangle
@@ -23,24 +25,16 @@ fn main() {
   execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
+  let menu_map = Menu::new("Main Menu")
+                .sub_menu("start",
+                  Menu::new("start new game")
+                  .action("opt0", &|| {})
+                  .action("opt1", &|| {})
+                  .back("back")
+                )
+                .back("quit");
 
-  let mut game = Game::new(terminal.root.clone());
-
-  game.init_board();
-  game.board.render();
-  terminal.refresh().unwrap();
-
-  for y in 0..8 {
-    for x in 0..8 {
-      terminal.clear();
-      game.board.move_cursor(x, y);
-      game.board.render();
-      terminal.refresh().unwrap();
-      sleep(1000);
-    } 
-  }
-
-  sleep(5000);
+  menu_map.run(&mut terminal);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
