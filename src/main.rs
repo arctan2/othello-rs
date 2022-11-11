@@ -22,10 +22,10 @@ fn sleep(ms: u64) {
 
 fn main() {
   enable_raw_mode().unwrap();
-  execute!(stdout(), cursor::Hide, EnterAlternateScreen).unwrap();
+  execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
-  let menu_map = Menu::new("Main Menu")
+  let mut menu_map = Menu::new("Main Menu")
                 .sub_menu("start",
                   Menu::new("start new game")
                   .action("opt0", &|| {})

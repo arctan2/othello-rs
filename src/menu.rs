@@ -1,8 +1,8 @@
 use std::{io::Write, thread, time::Duration};
 
-use crossterm::style::Color;
+use crossterm::{style::Color, event::{Event, KeyCode}};
 
-use crate::termin::{terminal_window::Terminal, elements::Text, window::Window};
+use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::Window};
 
 pub struct Action <'a> {
   label: &'a str,
@@ -49,26 +49,59 @@ impl <'a> Menu <'a> {
     self
   }
 
-  pub fn run<W: Write>(&self, terminal: &mut Terminal<W>) {
+  pub fn run<W: Write>(&mut self, terminal: &mut Terminal<W>) {
     let heading = Text::default().text(self.heading).size(10, 1);
     let mut options_win = terminal.root.new_child(Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2));
-    let mut opt = Text::default();
+    let mut opt = Text::default().start_text((1, 0));
 
     terminal.root.draw_element(&heading);
 
-    for (idx, o) in self.list.iter().enumerate() {
-      let label = match o {
-        MenuItem::Action(a) => a.label,
-        MenuItem::SubMenu(m) => m.label
-      };
+    loop {
+      options_win.clear();
+      for (idx, o) in self.list.iter().enumerate() {
+        let label = match o {
+          MenuItem::Action(a) => a.label,
+          MenuItem::SubMenu(m) => m.label
+        };
 
-      opt.set_size(label.len() as u16, 1);
-      opt.set_text(label);
-      opt.set_pos(0, (idx * 2) as u16);
-      options_win.draw_element(&opt);
+        opt.set_size(label.len() as u16 + 2, 1);
+        opt.set_text(label);
+        opt.set_fg(Color::Reset);
+        opt.set_pos(0, (idx * 2) as u16);
+
+        if idx == self.cursor as usize {
+          let bg = Rectangle::from_rect(opt.get_rect()).bg(Color::Green);
+          options_win.draw_element(&bg); 
+          opt.set_fg(Color::Black);
+        }
+
+        options_win.draw_element(&opt);
+      }
+      options_win.render();
+      terminal.refresh().unwrap();
+
+      match terminal.event() {
+        Event::Key(k) => {
+          match k.code {
+            KeyCode::Esc => return,
+            KeyCode::Down => {
+              self.cursor += 1;
+              if self.cursor == self.list.len() as u16 {
+                self.cursor = 0;
+              }
+            },
+            KeyCode::Up => {
+              if self.cursor == 0 {
+                self.cursor = (self.list.len() - 1) as u16;
+              } else {
+                self.cursor -= 1;
+              }
+            },
+            _ => ()
+          }
+        },
+        _ => ()
+      }
     }
-    options_win.render();
-    terminal.refresh().unwrap();
-    sleep(5000);
   }
 }

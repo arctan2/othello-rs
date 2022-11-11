@@ -39,7 +39,7 @@ impl InputBox {
     handler.flush().unwrap();
 
     loop {
-      match handler.getch().unwrap() {
+      match handler.event() {
         Event::Key(k) => {
           match k.code {
             KeyCode::Esc => {

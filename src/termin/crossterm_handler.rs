@@ -75,8 +75,8 @@ where W: Write {
     self.draw(win.inner().buffer().to_vec().into_iter())
   }
 
-  pub fn getch(&self) -> Result<Event, std::io::Error> {
-    read()
+  pub fn event(&self) -> Event {
+    read().unwrap()
   } 
 
   pub fn flush(&mut self) -> io::Result<()> {

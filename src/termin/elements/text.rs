@@ -19,6 +19,10 @@ impl Text {
     }
   }
 
+  pub fn get_rect(&self) -> Rect {
+    self.rect.clone()
+  }
+
   pub fn fg(mut self, fg: Color) -> Self {
     self.fg = fg;
     self

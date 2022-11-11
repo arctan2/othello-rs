@@ -15,6 +15,12 @@ impl Rectangle {
     Rectangle { rect: Rect::new(x, y, width, height), bg: Color::Reset }
   }
 
+  pub fn from_rect(rect: Rect) -> Self {
+    let mut r = Self::default();
+    r.rect = rect;
+    r
+  }
+
   pub fn bg(mut self, bg: Color) -> Self {
     self.bg = bg;
     self

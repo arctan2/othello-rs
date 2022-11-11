@@ -225,9 +225,8 @@ impl WindowRef {
       for x in 0..(endx as u16) {
         let a = self_buf_mut.get_mut(x + left, y + top);
         let b = buf.get(x, y);
-        if b.bg != Color::Reset {
-          a.bg = b.bg;
-        }
+
+        a.bg = b.bg;
         a.fg = b.fg;
         a.style = b.style;
         if b.symbol != " " {

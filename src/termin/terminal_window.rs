@@ -17,8 +17,8 @@ impl <W: Write> Terminal<W> {
     self.root.inner_mut().buffer_mut().reset();
   }
 
-  pub fn getch(&self) -> Result<Event, std::io::Error> {
-    self.handler.getch()
+  pub fn event(&self) -> Event {
+    self.handler.event()
   }
 
   pub fn refresh(&mut self) -> io::Result<()> {
