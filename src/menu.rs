@@ -4,30 +4,32 @@ use crossterm::{style::Color, event::{Event, KeyCode}};
 
 use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::Window};
 
-pub struct Action <'a> {
+pub struct Action <'a, W: Write> {
   label: &'a str,
-  action_fn: &'a dyn Fn() -> Return
+  action_fn: &'a dyn Fn(&mut Terminal<W>) -> Return
 }
 
-pub struct Menu <'a> {
+pub struct Menu <'a, W: Write> {
   heading: &'a str,
-  list: Vec<MenuItem<'a>>,
-  cursor: u16
+  list: Vec<MenuItem<'a, W>>,
+  cursor: u16,
+  id: u16
 }
 
-pub struct SubMenu <'a> {
+pub struct SubMenu <'a, W: Write> {
   label: &'a str,
-  menu: Menu<'a>
+  menu: Menu<'a, W>
 }
 
-pub enum MenuItem <'a> {
-  SubMenu(SubMenu<'a>),
-  Action(Action<'a>)
+pub enum MenuItem <'a, W: Write> {
+  SubMenu(SubMenu<'a, W>),
+  Action(Action<'a, W>)
 }
 
 pub enum Return {
+  ToRoot,
+  Back,
   None,
-  Once,
   All
 }
 
@@ -35,27 +37,28 @@ fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
 
-impl <'a> Menu <'a> {
+impl <'a, W: Write> Menu <'a, W> {
   pub fn new(heading: &'static str) -> Self {
-    Self { heading, list: vec![], cursor: 0 }
+    Self { heading, list: vec![], cursor: 0, id: 0 }
   }
 
-  pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn() -> Return) -> Self {
+  pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn(&mut Terminal<W>) -> Return) -> Self {
     self.list.push(MenuItem::<'a>::Action(Action{label, action_fn}));
     self
   }
 
-  pub fn sub_menu(mut self, label: &'a str, sub_menu: Menu<'a>) -> Self {
+  pub fn sub_menu(mut self, label: &'a str, mut sub_menu: Menu<'a, W>) -> Self {
+    sub_menu.id = self.id + 1; 
     self.list.push(MenuItem::<'a>::SubMenu(SubMenu{menu: sub_menu, label}));
     self
   }
 
   pub fn back(mut self, label: &'a str) -> Self {
-    self.list.push(MenuItem::<'a>::Action(Action{label, action_fn: &|| -> Return { Return::Once }}));
+    self.list.push(MenuItem::<'a>::Action(Action{label, action_fn: &|_| -> Return { Return::Back }}));
     self
   }
 
-  pub fn run<W: Write>(&mut self, terminal: &mut Terminal<W>) -> Return {
+  pub fn run(&mut self, terminal: &mut Terminal<W>) -> Return {
     terminal.root.clear();
     let heading = Text::default().text(self.heading).size(10, 1);
     let mut options_win = terminal.root.new_child(Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2));
@@ -108,22 +111,32 @@ impl <'a> Menu <'a> {
               let menu_item = &mut self.list[self.cursor as usize];
               match menu_item {
                 MenuItem::Action(a) => {
-                  match (a.action_fn)() {
-                    Return::Once => return Return::None,
+                  match (a.action_fn)(terminal) {
+                    Return::ToRoot => {
+                      if self.id != 0 {
+                        return Return::ToRoot;
+                      }
+                    },
+                    Return::Back => return Return::None,
                     Return::All => return Return::All,
                     Return::None => ()
                   }
                 },
                 MenuItem::SubMenu(sm) => {
                   match sm.menu.run(terminal) {
-                    Return::Once => return Return::None,
+                    Return::ToRoot => {
+                      if self.id != 0 {
+                        return Return::ToRoot;
+                      }
+                    },
+                    Return::Back => return Return::None,
                     Return::All => return Return::All,
                     Return::None => ()
                   }
-                  terminal.root.clear();
-                  terminal.root.draw_element(&heading);
                 }
               }
+              terminal.root.clear();
+              terminal.root.draw_element(&heading);
             },
             _ => ()
           }
