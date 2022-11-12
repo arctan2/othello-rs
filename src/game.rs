@@ -3,7 +3,7 @@ pub mod board;
 use board::Board;
 use crossterm::style::Color;
 
-use crate::termin::{window::{WindowRef, Window}, elements::Text};
+use crate::termin::{window::{WindowRef, Window}};
 
 use self::board::{BLACK, WHITE};
 

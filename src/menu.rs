@@ -6,12 +6,7 @@ use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, wind
 
 pub struct Action <'a> {
   label: &'a str,
-  action: &'a dyn Fn()
-}
-
-pub struct SubMenu <'a> {
-  label: &'a str,
-  menu: Menu<'a>
+  action_fn: &'a dyn Fn() -> Return
 }
 
 pub struct Menu <'a> {
@@ -20,9 +15,20 @@ pub struct Menu <'a> {
   cursor: u16
 }
 
+pub struct SubMenu <'a> {
+  label: &'a str,
+  menu: Menu<'a>
+}
+
 pub enum MenuItem <'a> {
   SubMenu(SubMenu<'a>),
   Action(Action<'a>)
+}
+
+pub enum Return {
+  None,
+  Once,
+  All
 }
 
 fn sleep(ms: u64) {
@@ -34,8 +40,8 @@ impl <'a> Menu <'a> {
     Self { heading, list: vec![], cursor: 0 }
   }
 
-  pub fn action(mut self, label: &'a str, action: &'a dyn Fn()) -> Self {
-    self.list.push(MenuItem::<'a>::Action(Action{label, action}));
+  pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn() -> Return) -> Self {
+    self.list.push(MenuItem::<'a>::Action(Action{label, action_fn}));
     self
   }
 
@@ -45,11 +51,12 @@ impl <'a> Menu <'a> {
   }
 
   pub fn back(mut self, label: &'a str) -> Self {
-    self.list.push(MenuItem::<'a>::Action(Action{label, action: &|| {}}));
+    self.list.push(MenuItem::<'a>::Action(Action{label, action_fn: &|| -> Return { Return::Once }}));
     self
   }
 
-  pub fn run<W: Write>(&mut self, terminal: &mut Terminal<W>) {
+  pub fn run<W: Write>(&mut self, terminal: &mut Terminal<W>) -> Return {
+    terminal.root.clear();
     let heading = Text::default().text(self.heading).size(10, 1);
     let mut options_win = terminal.root.new_child(Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2));
     let mut opt = Text::default().start_text((1, 0));
@@ -83,7 +90,7 @@ impl <'a> Menu <'a> {
       match terminal.event() {
         Event::Key(k) => {
           match k.code {
-            KeyCode::Esc => return,
+            KeyCode::Esc => return Return::All,
             KeyCode::Down => {
               self.cursor += 1;
               if self.cursor == self.list.len() as u16 {
@@ -95,6 +102,27 @@ impl <'a> Menu <'a> {
                 self.cursor = (self.list.len() - 1) as u16;
               } else {
                 self.cursor -= 1;
+              }
+            },
+            KeyCode::Enter => {
+              let menu_item = &mut self.list[self.cursor as usize];
+              match menu_item {
+                MenuItem::Action(a) => {
+                  match (a.action_fn)() {
+                    Return::Once => return Return::None,
+                    Return::All => return Return::All,
+                    Return::None => ()
+                  }
+                },
+                MenuItem::SubMenu(sm) => {
+                  match sm.menu.run(terminal) {
+                    Return::Once => return Return::None,
+                    Return::All => return Return::All,
+                    Return::None => ()
+                  }
+                  terminal.root.clear();
+                  terminal.root.draw_element(&heading);
+                }
               }
             },
             _ => ()

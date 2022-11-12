@@ -7,17 +7,19 @@ use std::thread;
 use std::io::stdout;
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  execute, cursor, style::Color
+  execute, cursor
 };
-use game::Game;
-use menu::Menu;
+use menu::{Menu, Return};
 use termin::{
   crossterm_handler::CrosstermHandler,
-  window::Window, elements::Rectangle
 };
 
 fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
+}
+
+fn t() -> Return {
+  return Return::All
 }
 
 fn main() {
@@ -26,10 +28,14 @@ fn main() {
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
   let mut menu_map = Menu::new("Main Menu")
-                .sub_menu("start",
+                .sub_menu("Start",
                   Menu::new("start new game")
-                  .action("opt0", &|| {})
-                  .action("opt1", &|| {})
+                  .sub_menu("opt0",
+                    Menu::new("hehehehaw")
+                    .action("all the way back", &t)
+                    .back("bakc")
+                  )
+                  .action("opt1", &|| -> Return { Return::None })
                   .back("back")
                 )
                 .back("quit");

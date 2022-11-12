@@ -5,11 +5,11 @@ use crate::termin::{window::WindowRef, elements::{Rectangle, Text}};
 pub const BLACK: char = 'b';
 pub const WHITE: char = 'w';
 
-const left: i8 = -1;
+const LEFT: i8 = -1;
 const right: i8= 1;
-const up: i8  = -1;
-const down: i8  = 1;
-const fix: i8 = 0;
+const UP: i8  = -1;
+const DOWN: i8  = 1;
+const FIX: i8 = 0;
 
 type Side = char;
 
@@ -27,14 +27,14 @@ pub struct Board {
 }
 
 const TRAV_ARR: [[i8; 2]; 8] = [
-	[up, fix],
-	[down, fix],
-	[fix, left],
-	[fix, right],
-	[up, right],
-	[up, left],
-	[down, left],
-	[down, right],
+	[UP, FIX],
+	[DOWN, FIX],
+	[FIX, LEFT],
+	[FIX, right],
+	[UP, right],
+	[UP, LEFT],
+	[DOWN, LEFT],
+	[DOWN, right],
 ];
 
 impl Board {
