@@ -24,7 +24,9 @@ impl Game {
 		let mut board_container = root_win.new_child(
 			Window::default().size(width + 4, height + 2).bg(Color::Green)
 		);
-		let board = board_container.new_child(Window::default().size(32 - 2, 15).position(2, 1));
+		let board = board_container.new_child(
+			Window::default().size(32 - 2, 15).position(2, 1).bg(Color::Green)
+		);
 		Self { board: Board::new(board_container, board) }
 	}
 
