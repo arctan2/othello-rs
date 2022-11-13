@@ -13,8 +13,8 @@ use crossterm::{
   execute, cursor
 };
 use game::{Game, board};
-use menu::{Menu, Return};
-use termin::elements::Rectangle;
+use menu::{Menu, Return, MenuRoot};
+use termin::elements::{Rectangle, Text};
 use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
@@ -32,7 +32,7 @@ fn game_loop<W: Write>(terminal: &mut Terminal<W>, mut game: Game) {
 }
 
 enum Ctx {
-  Name(String)
+  Name(&'static str)
 }
 
 fn main() {
@@ -43,21 +43,32 @@ fn main() {
 
   let mut game_ctx = HashMap::new();
 
-  game_ctx.insert("name", Ctx::Name("".to_string()));
+  game_ctx.insert("name", Ctx::Name(""));
 
-  let mut menu_map = Menu::new("Main Menu")
+  let mut menu_map = MenuRoot::new(Menu::new("Main Menu")
                 .sub_menu("Start",
-                  Menu::new("start new game")
-                  .action("offline", &|terminal| -> Return {
+                  Menu::<Ctx>::new("start new game")
+                  .action("offline", &|terminal, _| -> Return {
                     let game = Game::new(terminal.root.clone());
                     game_loop(terminal, game);
                     Return::ToRoot
                   })
+                  .action("change name", &|terminal, ctx| -> Return {
+                    ctx.insert("name", Ctx::Name("hehehehaw huahahahha"));
+                    let t = Text::default().text(match ctx.get("name").unwrap() {
+                      Ctx::Name(n) => n
+                    });
+                    terminal.root.clear();
+                    terminal.root.draw_element(&t);
+                    terminal.refresh().unwrap();
+                    sleep(2000);
+                    Return::ToRoot
+                  })
                   .back("back")
                 )
-                .back("quit");
+                .back("quit"), game_ctx);
   
-  menu_map.run(&mut terminal, &mut game_ctx);
+  menu_map.run(&mut terminal);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
