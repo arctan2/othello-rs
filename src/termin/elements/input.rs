@@ -45,6 +45,9 @@ impl InputBox {
             KeyCode::Esc => {
               return self.input_box.get_text().to_string();
             },
+            KeyCode::Enter => {
+              return self.input_box.get_text().to_string();
+            },
             KeyCode::Backspace => {
               if cursor_pos > 0 {
                 cursor_pos -= 1;

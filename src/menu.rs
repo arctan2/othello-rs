@@ -6,7 +6,7 @@ use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, wind
 
 pub struct Action <'a, T> {
   label: &'a str,
-  action_fn: &'a dyn Fn(&mut Terminal<Stdout>, &mut HashMap<&str, T>) -> Return
+  action_fn: &'a dyn Fn(&mut Terminal<Stdout>, &mut T) -> Return
 }
 
 pub struct Menu <'a, T> {
@@ -18,7 +18,7 @@ pub struct Menu <'a, T> {
 
 pub struct MenuRoot<'a, T> {
   menu: Menu<'a, T>,
-  ctx: HashMap<&'static str, T>
+  ctx: T
 }
 
 pub struct SubMenu <'a, T> {
@@ -43,7 +43,7 @@ fn sleep(ms: u64) {
 }
 
 impl <'a, T> MenuRoot <'a, T> {
-  pub fn new(menu: Menu<'a, T>, ctx: HashMap<&'static str, T>) -> Self {
+  pub fn new(menu: Menu<'a, T>, ctx: T) -> Self {
     Self { ctx, menu }
   }
 
@@ -57,7 +57,7 @@ impl <'a, T> Menu <'a, T> {
     Self { heading, list: vec![], cursor: 0, id: 0 }
   }
 
-  pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn(&mut Terminal<Stdout>, &mut HashMap<&str, T>) -> Return) -> Self {
+  pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn(&mut Terminal<Stdout>, &mut T) -> Return) -> Self {
     self.list.push(MenuItem::<'a>::Action(Action{label, action_fn}));
     self
   }
@@ -73,7 +73,7 @@ impl <'a, T> Menu <'a, T> {
     self
   }
 
-  pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut HashMap<&str, T>) -> Return {
+  pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut T) -> Return {
     terminal.root.clear();
     let heading = Text::default().text(self.heading).size(10, 1);
     let mut options_win = terminal.root.new_child(Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2));

@@ -36,11 +36,18 @@ impl <W: Write> Terminal<W> {
     }
   }
 
-  pub fn handle_input<F>(&mut self, func: F)
+  pub fn handle_input<F, R>(&mut self, func: F) -> R
   where
-    F: FnOnce(&mut CrosstermHandler<W>)
+    F: FnOnce(&mut CrosstermHandler<W>, &mut WindowRef) -> R
   {
-    func(&mut self.handler);
+    func(&mut self.handler, &mut self.root)
+  }
+
+  pub fn handle_input_ctx<F, T, R>(&mut self, func: F, ctx: T) -> R
+  where
+    F: FnOnce(&mut CrosstermHandler<W>, &mut WindowRef, T) -> R
+  {
+    func(&mut self.handler, &mut self.root, ctx)
   }
 
   pub fn flush(&mut self) -> io::Result<()> {

@@ -19,6 +19,9 @@ use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
 
+use crate::termin::elements::InputBox;
+use crate::termin::window::Window;
+
 fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
@@ -31,19 +34,17 @@ fn game_loop<W: Write>(terminal: &mut Terminal<W>, mut game: Game) {
   sleep(2000);
 }
 
-enum Ctx {
-  Name(&'static str)
-}
-
 fn main() {
   enable_raw_mode().unwrap();
   execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
 
   let mut terminal = termin::root(CrosstermHandler::new(stdout()));
 
-  let mut game_ctx = HashMap::new();
+  struct Ctx {
+    name: String
+  }
 
-  game_ctx.insert("name", Ctx::Name(""));
+  let game_ctx = Ctx { name: "asdsadasdasd".to_string() };
 
   let mut menu_map = MenuRoot::new(Menu::new("Main Menu")
                 .sub_menu("Start",
@@ -53,15 +54,21 @@ fn main() {
                     game_loop(terminal, game);
                     Return::ToRoot
                   })
-                  .action("change name", &|terminal, ctx| -> Return {
-                    ctx.insert("name", Ctx::Name("hehehehaw huahahahha"));
-                    let t = Text::default().text(match ctx.get("name").unwrap() {
-                      Ctx::Name(n) => n
-                    });
+                  .action("change name", &|terminal, mut ctx| -> Return {
                     terminal.root.clear();
-                    terminal.root.draw_element(&t);
-                    terminal.refresh().unwrap();
-                    sleep(2000);
+
+                    let name = terminal.handle_input(|handler, root| -> String {
+                      let heading = Text::default().text("Change Name");
+                      let label = Text::default().text("new name: ").position(0, 2);
+                      let mut input = InputBox::default()
+                                      .position(label.get_rect().x, label.get_rect().y)
+                                      .size(20, 1).start_text((label.get_text().len() as u16, 0));
+                      root.draw_element(&label);
+                      root.draw_element(&heading);
+                      root.read_string(&mut input, handler)
+                    });
+
+                    ctx.name = name;
                     Return::ToRoot
                   })
                   .back("back")
