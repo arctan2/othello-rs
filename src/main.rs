@@ -2,8 +2,6 @@ mod termin;
 mod game;
 mod menu;
 
-use std::collections::HashMap;
-use std::iter::Map;
 use std::{time::Duration, io::Write};
 use std::thread;
 use std::io::stdout;
@@ -20,7 +18,7 @@ use termin::{
 };
 
 use crate::termin::elements::InputBox;
-use crate::termin::window::Window;
+use crate::termin::window::{Window, Position::{Center, Coord}};
 
 fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
@@ -47,14 +45,14 @@ fn main() {
   let game_ctx = Ctx { name: "asdsadasdasd".to_string() };
 
   let mut menu_map = MenuRoot::new(Menu::new("Main Menu")
-                .sub_menu("Start",
+                .sub_menu("create game",
                   Menu::<Ctx>::new("start new game")
                   .action("offline", &|terminal, _| -> Return {
                     let game = Game::new(terminal.root.clone());
                     game_loop(terminal, game);
                     Return::ToRoot
                   })
-                  .action("change name", &|terminal, mut ctx| -> Return {
+                  .action("Change name", &|terminal, mut ctx| -> Return {
                     terminal.root.clear();
 
                     let name = terminal.handle_input(|handler, root| -> String {

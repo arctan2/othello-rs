@@ -2,7 +2,7 @@ use std::{io::{Write, Stdout}, thread, time::Duration, collections::HashMap};
 
 use crossterm::{style::Color, event::{Event, KeyCode}};
 
-use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::Window};
+use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::{Center, Coord}}};
 
 pub struct Action <'a, T> {
   label: &'a str,
@@ -76,7 +76,10 @@ impl <'a, T> Menu <'a, T> {
   pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut T) -> Return {
     terminal.root.clear();
     let heading = Text::default().text(self.heading).size(10, 1);
-    let mut options_win = terminal.root.new_child(Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2));
+    let mut options_win = terminal.root.new_child(
+      Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2)
+    );
+    options_win.set_pos(Center{h: true, v: true});
     let mut opt = Text::default().start_text((1, 0));
 
     terminal.root.draw_element(&heading);

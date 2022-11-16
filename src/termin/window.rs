@@ -2,6 +2,8 @@ use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}, io::Write};
 
 use crossterm::style::Color;
 
+use crate::sleep;
+
 use super::{
   elements::{Element, InputBox},
   buffer::{Rect, Buffer}, crossterm_handler::CrosstermHandler
@@ -24,6 +26,12 @@ impl fmt::Debug for Window {
   }
 }
 
+#[derive(Debug)]
+pub enum Position {
+  Center{h: bool, v: bool},
+  Coord(u16, u16)
+}
+
 impl Window {
   pub fn default() -> Self {
     Window::new(0, 0, 0, 0)
@@ -37,12 +45,35 @@ impl Window {
     }
   }
 
-  pub fn set_pos(&mut self, x: u16, y: u16) {
-    self.buffer.set_pos(x, y);
+  pub fn set_pos(&mut self, pos: Position) {
+    match pos {
+      Position::Coord(x, y) => self.buffer.set_pos(x, y),
+      Position::Center { h, v } => {
+        let p = &self.parent;
+        match p {
+          Some(parent) => {
+            let self_rect = self.buffer.rect();
+            let (x, y) = parent.inner().buffer.rect().get_center_start_pos(self.buffer.rect());
+
+
+            if h && v {
+              self.buffer.set_pos(x, y);
+            } else {
+              if h {
+                self.buffer.set_pos(x, self_rect.y);
+              } else {
+                self.buffer.set_pos(self_rect.x, y);
+              }
+            }
+          },
+          None => ()
+        }
+      }
+    }
   }
 
   pub fn position(mut self, x: u16, y: u16) -> Self {
-    self.buffer.set_pos(x, y);
+    self.set_pos(Position::Coord(x, y));
     self
   }
 
@@ -154,8 +185,8 @@ impl WindowRef {
     self.0.borrow()
   }
 
-  pub fn set_pos(&mut self, x: u16, y: u16) {
-    self.inner_mut().set_pos(x, y);
+  pub fn set_pos(&mut self, pos: Position) {
+    self.inner_mut().set_pos(pos);
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {

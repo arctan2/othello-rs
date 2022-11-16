@@ -54,26 +54,3 @@ impl <W: Write> Terminal<W> {
     self.handler.flush()
   }
 }
-
-/*
-This line must be above the self.inner_mut() as parent contains the win
-and will error that "already mutably borrowed: BorrowError"
-because we can't have immutable(win) varible be used after mutable(root)
-
-here's the structure
-
-parent: {
-  sub_windows: [win]
-}
-
-parent: {
-^^^^^ we are taking this as mutable
-  sub_windows: [win]
-                ^^^ but this is immut and can't be used after parent is borrowed "mutably"
-}
-
-And why does the Rc-RefCell deep check stuff??
-Like how does it know that win is inside root??
-
-I hope future me won't waste time on this again.
-*/

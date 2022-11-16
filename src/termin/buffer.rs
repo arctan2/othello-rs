@@ -57,6 +57,12 @@ impl Rect {
   pub fn area(&self) -> u16 {
     self.width * self.height
   }
+
+  pub fn get_center_start_pos(&self, rect: Rect) -> (u16, u16) {
+    let h = (self.width / 2) - (rect.width / 2);
+    let v = (self.height / 2) - (rect.height / 2);
+    (h, v)
+  }
 }
 
 impl Default for Rect {
@@ -161,6 +167,10 @@ impl Buffer {
 
   pub fn right(&self) -> u16 {
     self.rect.x + self.rect.width
+  }
+
+  pub fn rect(&self) -> Rect {
+    self.rect.clone()
   }
 
   pub fn to_vec(&self) -> Vec<(u16, u16, &Cell)> {
