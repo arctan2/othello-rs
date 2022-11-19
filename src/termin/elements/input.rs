@@ -24,7 +24,7 @@ impl InputBox {
   }
 
   pub fn position(mut self, x: u16, y: u16) -> Self {
-    self.input_box.set_pos(x, y);
+    self.input_box.set_xy(x, y);
     self
   }
 

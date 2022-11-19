@@ -1,8 +1,8 @@
-use std::{io::{Write, Stdout}, thread, time::Duration, collections::HashMap};
+use std::{io::Stdout, thread, time::Duration};
 
 use crossterm::{style::Color, event::{Event, KeyCode}};
 
-use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::{Center, Coord}}};
+use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::Center}};
 
 pub struct Action <'a, T> {
   label: &'a str,
@@ -74,15 +74,24 @@ impl <'a, T> Menu <'a, T> {
   }
 
   pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut T) -> Return {
-    terminal.root.clear();
-    let heading = Text::default().text(self.heading).size(10, 1);
-    let mut options_win = terminal.root.new_child(
-      Window::default().size(50, (self.list.len() * 2) as u16).position(2, 2)
+    let mut menu_win = terminal.root.new_child(
+      Window::default().size(50, (self.list.len() * 2 + 4) as u16)
     );
-    options_win.set_pos(Center{h: true, v: true});
+    let mut options_win = menu_win.new_child(
+      Window::default().size(40, (self.list.len() * 2 - 1) as u16)
+    );
+
+    let mut heading = Text::default().text(self.heading);
     let mut opt = Text::default().start_text((1, 0));
 
-    terminal.root.draw_element(&heading);
+    terminal.root.clear();
+    options_win.set_position(Center{h: true, v: true});
+
+    heading.set_position(menu_win.rect(), Center { h: true, v: false });
+    menu_win.draw_element(&heading);
+
+    menu_win.set_position(Center{h: false, v: true});
+    menu_win.set_xy_rel(10, -2);
 
     loop {
       options_win.clear();
@@ -95,7 +104,8 @@ impl <'a, T> Menu <'a, T> {
         opt.set_size(label.len() as u16 + 2, 1);
         opt.set_text(label);
         opt.set_fg(Color::Reset);
-        opt.set_pos(0, (idx * 2) as u16);
+        opt.set_xy(0, (idx * 2) as u16);
+        opt.set_position(options_win.rect(), Center{h: true, v: false});
 
         if idx == self.cursor as usize {
           let bg = Rectangle::from_rect(opt.get_rect()).bg(Color::Green);
@@ -105,7 +115,10 @@ impl <'a, T> Menu <'a, T> {
 
         options_win.draw_element(&opt);
       }
-      options_win.render();
+
+      terminal.root.clear();
+      options_win.render_to_parent();
+      menu_win.render();
       terminal.refresh().unwrap();
 
       match terminal.event() {
@@ -153,8 +166,8 @@ impl <'a, T> Menu <'a, T> {
                   }
                 }
               }
-              terminal.root.clear();
-              terminal.root.draw_element(&heading);
+              menu_win.clear();
+              menu_win.draw_element(&heading);
             },
             _ => ()
           }

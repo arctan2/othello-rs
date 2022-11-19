@@ -59,7 +59,7 @@ impl Board {
     for row in self.board {
       pos_x = 0;
       for col in row {
-        cell.set_pos(pos_x, pos_y);
+        cell.set_xy(pos_x, pos_y);
         cell.set_bg(if col == WHITE {
           Color::White
         } else if col == BLACK {
@@ -83,7 +83,7 @@ impl Board {
   pub fn render_cursor(&mut self) {
     let x = self.cursor.x * 4 + 2;
     let y = self.cursor.y * 2 + 1;
-    self.cursor.el.set_pos(x, y);
+    self.cursor.el.set_xy(x, y);
     self.board_container.draw_element(&self.cursor.el);
   }
 

@@ -1,6 +1,6 @@
-use super::buffer::{
+use super::{buffer::{
   Buffer, Rect
-};
+}, window::Position};
 
 pub trait Element {
   fn draw(&self, buf: &mut Buffer); 
@@ -29,14 +29,42 @@ macro_rules! impl_setters {
         self
       }
 
-      pub fn set_pos(&mut self, x: u16, y: u16) {
+      pub fn set_xy(&mut self, x: u16, y: u16) {
         self.rect.x = x;
         self.rect.y = y;
+      }
+
+      pub fn set_xy_rel(&mut self, mut dx: i16, mut dy: i16) {
+        let (x, y) = self.rect.get_xy();
+        dx += x as i16;
+        dy += y as i16;
+        if dx < 0 { dx = 0; }
+        if dy < 0 { dy = 0; }
+        self.set_xy(dx as u16, dy as u16);
       }
 
       pub fn set_size(&mut self, width: u16, height: u16) {
         self.rect.width = width;
         self.rect.height = height;
+      }
+
+      pub fn set_position(&mut self, rect: Rect, pos: Position) {
+        match pos {
+          Position::Coord(x, y) => self.set_xy(x, y),
+          Position::Center { h, v } => {
+            let (x, y) = rect.get_center_start_pos(self.rect.clone());
+
+            if h && v {
+              self.set_xy(x, y);
+            } else {
+              if h {
+                self.set_xy(x, self.rect.y);
+              } else {
+                self.set_xy(self.rect.x, y);
+              }
+            }
+          }
+        }
       }
     }
   };

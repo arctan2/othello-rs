@@ -58,6 +58,10 @@ impl Rect {
     self.width * self.height
   }
 
+  pub fn get_xy(&self) -> (u16, u16) {
+    (self.x, self.y)
+  }
+
   pub fn get_center_start_pos(&self, rect: Rect) -> (u16, u16) {
     let h = (self.width / 2) - (rect.width / 2);
     let v = (self.height / 2) - (rect.height / 2);

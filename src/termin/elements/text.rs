@@ -1,5 +1,5 @@
 use crossterm::style::Color;
-use super::{Buffer, Rect, Element, impl_setters};
+use super::{Buffer, Rect, Element, impl_setters, Position};
 
 pub struct Text {
   rect: Rect,

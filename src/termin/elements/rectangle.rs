@@ -1,6 +1,6 @@
 use crossterm::style::Color;
 use super::{
-  Buffer, Rect, Element, impl_setters
+  Buffer, Rect, Element, impl_setters, Position
 };
 
 #[derive(Debug)]

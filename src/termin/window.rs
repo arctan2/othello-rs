@@ -185,8 +185,17 @@ impl WindowRef {
     self.0.borrow()
   }
 
-  pub fn set_pos(&mut self, pos: Position) {
+  pub fn set_position(&mut self, pos: Position) {
     self.inner_mut().set_pos(pos);
+  }
+
+  pub fn set_xy_rel(&mut self, mut dx: i16, mut dy: i16) {
+    let (x, y) = self.inner().buffer.rect().get_xy();
+    dx += x as i16;
+    dy += y as i16;
+    if dx < 0 { dx = 0; }
+    if dy < 0 { dy = 0; }
+    self.set_position(Position::Coord(dx as u16, dy as u16));
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {
@@ -231,6 +240,10 @@ impl WindowRef {
 
   pub fn set_bg(&mut self, bg: Color) {
     self.inner_mut().set_bg(bg);
+  }
+
+  pub fn rect(&self) -> Rect {
+    self.inner().buffer.rect()
   }
 
   fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {
