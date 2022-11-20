@@ -2,7 +2,7 @@ use std::{io::Stdout, thread, time::Duration};
 
 use crossterm::{style::Color, event::{Event, KeyCode}};
 
-use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::Center}};
+use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::Center, WindowRef}};
 
 pub struct Action <'a, T> {
   label: &'a str,
@@ -10,15 +10,11 @@ pub struct Action <'a, T> {
 }
 
 pub struct Menu <'a, T> {
-  heading: &'a str,
+  pub heading: Text,
   list: Vec<MenuItem<'a, T>>,
   cursor: u16,
-  id: u16
-}
-
-pub struct MenuRoot<'a, T> {
-  menu: Menu<'a, T>,
-  ctx: T
+  id: u16,
+  routine_fn: Option<&'a dyn Fn(&mut Self, &mut T)>
 }
 
 pub struct SubMenu <'a, T> {
@@ -42,19 +38,9 @@ fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
 
-impl <'a, T> MenuRoot <'a, T> {
-  pub fn new(menu: Menu<'a, T>, ctx: T) -> Self {
-    Self { ctx, menu }
-  }
-
-  pub fn run(&mut self, terminal: &mut Terminal<Stdout>) {
-    self.menu.run(terminal, &mut self.ctx);
-  }
-}
-
 impl <'a, T> Menu <'a, T> {
   pub fn new(heading: &'static str) -> Self {
-    Self { heading, list: vec![], cursor: 0, id: 0 }
+    Self { heading: Text::default().text(heading), list: vec![], cursor: 0, id: 0, routine_fn: None }
   }
 
   pub fn action(mut self, label: &'a str, action_fn: &'a dyn Fn(&mut Terminal<Stdout>, &mut T) -> Return) -> Self {
@@ -73,25 +59,37 @@ impl <'a, T> Menu <'a, T> {
     self
   }
 
+  pub fn routine(mut self, func: &'a dyn Fn(&mut Self, &mut T)) -> Self {
+    self.routine_fn = Some(func);
+    self
+  }
+
   pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut T) -> Return {
     let mut menu_win = terminal.root.new_child(
-      Window::default().size(50, (self.list.len() * 2 + 4) as u16)
+      Window::default().size(terminal.root.get_width(), (self.list.len() * 2 + 4) as u16)
     );
     let mut options_win = menu_win.new_child(
       Window::default().size(40, (self.list.len() * 2 - 1) as u16)
     );
 
-    let mut heading = Text::default().text(self.heading);
     let mut opt = Text::default().start_text((1, 0));
+    let run_routine = |s: &mut Self, ctx: &mut T| {
+      match s.routine_fn {
+        Some(r) => r(s, ctx),
+        None => ()
+      }
+    };
 
     terminal.root.clear();
+    run_routine(self, ctx);
     options_win.set_position(Center{h: true, v: true});
 
-    heading.set_position(menu_win.rect(), Center { h: true, v: false });
-    menu_win.draw_element(&heading);
+    self.heading.set_position(menu_win.rect(), Center { h: true, v: false });
+    menu_win.draw_element(&self.heading);
 
     menu_win.set_position(Center{h: false, v: true});
-    menu_win.set_xy_rel(10, -2);
+    menu_win.set_xy_rel(0, -2);
+
 
     loop {
       options_win.clear();
@@ -167,7 +165,9 @@ impl <'a, T> Menu <'a, T> {
                 }
               }
               menu_win.clear();
-              menu_win.draw_element(&heading);
+              run_routine(self, ctx);
+              self.heading.set_position(menu_win.rect(), Center{h: true, v: false});
+              menu_win.draw_element(&self.heading);
             },
             _ => ()
           }

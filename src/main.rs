@@ -11,14 +11,13 @@ use crossterm::{
   execute, cursor
 };
 use game::{Game, board};
-use menu::{Menu, Return, MenuRoot};
+use menu::{Menu, Return};
 use termin::elements::{Rectangle, Text};
 use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
 
 use crate::termin::elements::InputBox;
-use crate::termin::window::{Window, Position::{Center, Coord}};
 
 fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
@@ -42,38 +41,44 @@ fn main() {
     name: String
   }
 
-  let game_ctx = Ctx { name: "asdsadasdasd".to_string() };
+  let mut game_ctx = Ctx { name: "Player".to_string() };
 
-  let mut menu_map = MenuRoot::new(Menu::new("Main Menu")
-                .sub_menu("create game",
-                  Menu::<Ctx>::new("start new game")
-                  .action("offline", &|terminal, _| -> Return {
-                    let game = Game::new(terminal.root.clone());
-                    game_loop(terminal, game);
-                    Return::ToRoot
-                  })
-                  .action("Change name", &|terminal, mut ctx| -> Return {
-                    terminal.root.clear();
+  let mut menu_map = Menu::<Ctx>::new("Main Menu")
+          .routine(&|menu, ctx| {
+            let mut s = "Welome ".to_owned();
+            s.push_str(&ctx.name);
+            menu.heading.set_text(&s);
+            menu.heading.width_fit();
+          })
+          .sub_menu("create game",
+            Menu::<Ctx>::new("Create game")
+            .action("offline", &|terminal, _| -> Return {
+              let game = Game::new(terminal.root.clone());
+              game_loop(terminal, game);
+              Return::ToRoot
+            })
+            .back("back")
+          )
+          .action("Change name", &|terminal, mut ctx| -> Return {
+            terminal.root.clear();
 
-                    let name = terminal.handle_input(|handler, root| -> String {
-                      let heading = Text::default().text("Change Name");
-                      let label = Text::default().text("new name: ").position(0, 2);
-                      let mut input = InputBox::default()
-                                      .position(label.get_rect().x, label.get_rect().y)
-                                      .size(20, 1).start_text((label.get_text().len() as u16, 0));
-                      root.draw_element(&label);
-                      root.draw_element(&heading);
-                      root.read_string(&mut input, handler)
-                    });
+            let name = terminal.handle_input(|handler, root| -> String {
+              let heading = Text::default().text("Change Name");
+              let label = Text::default().text("new name: ").position(0, 2);
+              let mut input = InputBox::default()
+                              .position(label.get_rect().x, label.get_rect().y)
+                              .size(20, 1).start_text((label.get_text().len() as u16, 0));
+              root.draw_element(&label);
+              root.draw_element(&heading);
+              root.read_string(&mut input, handler)
+            });
 
-                    ctx.name = name;
-                    Return::ToRoot
-                  })
-                  .back("back")
-                )
-                .back("quit"), game_ctx);
+            ctx.name = name;
+            Return::None
+          })
+          .back("quit");
   
-  menu_map.run(&mut terminal);
+  menu_map.run(&mut terminal, &mut game_ctx);
 
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();

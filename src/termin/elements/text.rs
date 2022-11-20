@@ -33,13 +33,7 @@ impl Text {
   }
 
   pub fn text(mut self, text: &str) -> Self {
-    self.text = text.to_string();
-    if self.rect.width == 0 {
-      self.rect.width = text.len() as u16;
-    }
-    if self.rect.height == 0 {
-      self.rect.height = 1;
-    }
+    self.set_text(text);
     self
   }
 
@@ -52,8 +46,21 @@ impl Text {
     self.start_text = start_text
   }
 
+  pub fn width_fit(&mut self) {
+    self.rect.width = self.text.len() as u16;
+    if self.rect.height == 0 {
+      self.rect.height = 1;
+    }
+  }
+
   pub fn set_text(&mut self, text: &str) {
     self.text = text.to_string();
+    if self.rect.width == 0 {
+      self.rect.width = text.len() as u16;
+    }
+    if self.rect.height == 0 {
+      self.rect.height = 1;
+    }
   }
 
   pub fn push_string(&mut self, s: String) {
