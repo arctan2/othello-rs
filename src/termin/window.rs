@@ -12,17 +12,18 @@ use super::{
 pub struct Window {
   buffer: Buffer,
   sub_windows: Vec<WindowRef>,
-  parent: Option<WindowRef>
+  parent: Option<WindowRef>,
+  id: usize
 }
 
 type WinRef = Rc<RefCell<Window>>;
 
 impl fmt::Debug for Window {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Window {{\n  parent: {}, \n  buffer: {:#?}\n}}", match self.parent {
+    write!(f, "Window {{\n  parent: {}, \n  id: {}, \n  buffer: {:#?}, \n  children: {}\n}}\n", match self.parent {
       None => "None",
       _ => "<WindowRef>"
-    }, self.buffer())
+    }, self.id, self.buffer(), self.children().len())
   }
 }
 
@@ -41,7 +42,8 @@ impl Window {
     Window {
       buffer: Buffer::empty(Rect::new(x, y, width, height)),
       sub_windows: vec![],
-      parent: None
+      parent: None,
+      id: 0
     }
   }
 
@@ -116,8 +118,12 @@ impl Window {
     self.buffer.reset();
   }
 
-  pub fn children(&self) -> Vec<WindowRef> {
+  fn children(&self) -> Vec<WindowRef> {
     self.sub_windows.clone()
+  }
+
+  fn delete_child_by_id(&mut self, id: usize) {
+    self.sub_windows.remove(id);
   }
 
   pub fn abs_pos(&self) -> (u16, u16) {
@@ -143,7 +149,6 @@ impl Window {
   }
 }
 
-
 #[derive(Clone, Debug)]
 pub struct WindowRef(WinRef);
 
@@ -156,7 +161,8 @@ impl WindowRef {
     WindowRef(Rc::new(RefCell::new(Window {
       buffer: Buffer::empty(Rect::new(x, y, width, height)),
       sub_windows: vec![],
-      parent: None
+      parent: None,
+      id: 0
     })))
   }
 
@@ -164,7 +170,12 @@ impl WindowRef {
     WindowRef(Rc::new(RefCell::new(win)))
   }
 
-  pub fn new_child(&mut self, win: Window) -> Self {
+  pub fn id(&self) -> usize {
+    self.inner().id
+  }
+
+  pub fn new_child(&mut self, mut win: Window) -> Self {
+    win.id = self.0.borrow_mut().sub_windows.len();
     let child = WindowRef(
       Rc::new(
         RefCell::new(
@@ -244,6 +255,18 @@ impl WindowRef {
 
   pub fn rect(&self) -> Rect {
     self.inner().buffer.rect()
+  }
+
+  pub fn delete(&mut self) {
+    let id = self.id();
+    match self.parent() {
+      Some(p) => {
+        let mut p = p.0.borrow_mut();
+        p.parent = None;
+        p.delete_child_by_id(id);
+      },
+      None => ()
+    }
   }
 
   fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {

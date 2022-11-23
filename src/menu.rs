@@ -89,7 +89,14 @@ impl <'a, T> Menu <'a, T> {
 
     menu_win.set_position(Center{h: false, v: true});
     menu_win.set_xy_rel(0, -2);
+      
+    let return_val: Return;
 
+    macro_rules! RETURN {
+      ($v:ident) => {
+        return_val = Return::$v; break;
+      };
+    }
 
     loop {
       options_win.clear();
@@ -122,7 +129,9 @@ impl <'a, T> Menu <'a, T> {
       match terminal.event() {
         Event::Key(k) => {
           match k.code {
-            KeyCode::Esc => return Return::All,
+            KeyCode::Esc => {
+              RETURN!(All);
+            },
             KeyCode::Down => {
               self.cursor += 1;
               if self.cursor == self.list.len() as u16 {
@@ -143,11 +152,11 @@ impl <'a, T> Menu <'a, T> {
                   match (a.action_fn)(terminal, ctx) {
                     Return::ToRoot => {
                       if self.id != 0 {
-                        return Return::ToRoot;
+                        RETURN!(ToRoot);
                       }
                     },
-                    Return::Back => return Return::None,
-                    Return::All => return Return::All,
+                    Return::Back => { RETURN!(None); },
+                    Return::All => { RETURN!(All); },
                     Return::None => ()
                   }
                 },
@@ -155,11 +164,11 @@ impl <'a, T> Menu <'a, T> {
                   match sm.menu.run(terminal, ctx) {
                     Return::ToRoot => {
                       if self.id != 0 {
-                        return Return::ToRoot;
+                        RETURN!(ToRoot);
                       }
                     },
-                    Return::Back => return Return::None,
-                    Return::All => return Return::All,
+                    Return::Back => { RETURN!(None); },
+                    Return::All => { RETURN!(All); },
                     Return::None => ()
                   }
                 }
@@ -175,5 +184,8 @@ impl <'a, T> Menu <'a, T> {
         _ => ()
       }
     }
+
+    menu_win.delete();
+    return_val
   }
 }

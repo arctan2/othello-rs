@@ -8,12 +8,13 @@ use super::{Text, Element};
 
 pub struct InputBox {
   input_box: Text,
+  max_len: i32,
   cursor: (u16, u16)
 }
 
 impl Default for InputBox {
   fn default() -> Self {
-    Self { input_box: Text::default(), cursor: (0, 0) }
+    Self { input_box: Text::default(), cursor: (0, 0), max_len: 0 }
   }
 }
 
@@ -25,6 +26,11 @@ impl InputBox {
 
   pub fn position(mut self, x: u16, y: u16) -> Self {
     self.input_box.set_xy(x, y);
+    self
+  }
+
+  pub fn max_len(mut self, max_len: i32) -> Self{
+    self.max_len = max_len;
     self
   }
 
@@ -55,8 +61,10 @@ impl InputBox {
               }
             },
             KeyCode::Char(ch) => {
-              self.input_box.add_char_at(cursor_pos, ch);
-              cursor_pos += 1;
+              if (self.input_box.get_text().len() as i32) < self.max_len {
+                self.input_box.add_char_at(cursor_pos, ch);
+                cursor_pos += 1;
+              }
             },
             KeyCode::Left => {
               cursor_pos -= if cursor_pos != 0 { 1 } else { 0 };
