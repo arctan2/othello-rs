@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use crossterm::event::{read, Event};
+use crossterm::event::Event;
 
 use super::{crossterm_handler::CrosstermHandler, window::{Window, WindowRef}};
 
@@ -22,7 +22,7 @@ impl <W: Write> Terminal<W> {
   }
 
   pub fn refresh(&mut self) -> io::Result<()> {
-    match self.handler.draw(self.root.inner().buffer().to_vec().into_iter()) {
+    match self.handler.draw(self.root.inner().buffer().to_vec((0, 0)).into_iter()) {
       Ok(()) => (),
       Err(_) => panic!("error while drawing the buffer")
     }
@@ -30,7 +30,7 @@ impl <W: Write> Terminal<W> {
   }
 
   pub fn draw_window(&mut self, win: &WindowRef) {
-    match self.handler.draw(win.inner().buffer().to_vec().into_iter()) {
+    match self.handler.draw(win.inner().buffer().to_vec((0, 0)).into_iter()) {
       Ok(()) => (),
       Err(_) => panic!("error while drawing the buffer")
     }

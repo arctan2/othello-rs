@@ -72,7 +72,7 @@ where W: Write {
   }
 
   pub fn draw_window(&mut self, win: &WindowRef) -> io::Result<()> {
-    self.draw(win.inner().buffer().to_vec().into_iter())
+    self.draw(win.inner().buffer().to_vec(win.abs_pos()).into_iter())
   }
 
   pub fn event(&self) -> Event {

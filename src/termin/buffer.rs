@@ -177,12 +177,12 @@ impl Buffer {
     self.rect.clone()
   }
 
-  pub fn to_vec(&self) -> Vec<(u16, u16, &Cell)> {
+  pub fn to_vec(&self, abs: (u16, u16)) -> Vec<(u16, u16, &Cell)> {
     let mut result: Vec<(u16, u16, &Cell)> = vec![];
 
     for y in 0..self.height() {
       for x in 0..self.width() {
-        result.push((x, y, self.get(x, y)));
+        result.push((x + abs.1, y + abs.0, self.get(x, y)));
       }
     }
     result
