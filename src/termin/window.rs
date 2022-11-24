@@ -1,4 +1,4 @@
-use std::{fmt, rc::Rc, cell::{RefCell, RefMut, Ref}, io::Write};
+use std::{fmt, rc::{Rc, Weak}, cell::{RefCell, RefMut, Ref}, io::Write};
 
 use crossterm::style::Color;
 
@@ -12,7 +12,7 @@ use super::{
 pub struct Window {
   buffer: Buffer,
   sub_windows: Vec<WindowRef>,
-  parent: Option<WindowRef>,
+  parent: Weak<RefCell<Window>>,
   id: usize
 }
 
@@ -20,7 +20,7 @@ type WinRef = Rc<RefCell<Window>>;
 
 impl fmt::Debug for Window {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Window {{\n  parent: {}, \n  id: {}, \n  buffer: {:#?}, \n  children: {}\n}}\n", match self.parent {
+    write!(f, "Window {{\n  parent: {}, \n  id: {}, \n  buffer: {:#?}, \n  children: {}\n}}\n", match self.parent.upgrade() {
       None => "None",
       _ => "<WindowRef>"
     }, self.id, self.buffer(), self.children().len())
@@ -42,7 +42,7 @@ impl Window {
     Window {
       buffer: Buffer::empty(Rect::new(x, y, width, height)),
       sub_windows: vec![],
-      parent: None,
+      parent: Weak::new(),
       id: 0
     }
   }
@@ -51,12 +51,10 @@ impl Window {
     match pos {
       Position::Coord(x, y) => self.buffer.set_pos(x, y),
       Position::Center { h, v } => {
-        let p = &self.parent;
-        match p {
+        match self.parent.upgrade() {
           Some(parent) => {
             let self_rect = self.buffer.rect();
-            let (x, y) = parent.inner().buffer.rect().get_center_start_pos(self.buffer.rect());
-
+            let (x, y) = parent.borrow().buffer.rect().get_center_start_pos(self.buffer.rect());
 
             if h && v {
               self.buffer.set_pos(x, y);
@@ -80,7 +78,7 @@ impl Window {
   }
 
   pub fn parent(mut self, parent: WindowRef) -> Self {
-    self.parent.replace(parent);
+    self.parent = Rc::downgrade(&parent.0);
     self
   }
 
@@ -89,7 +87,7 @@ impl Window {
     self
   }
 
-  pub fn get_parent(&self) -> Option<WindowRef> {
+  pub fn get_parent(&self) -> Weak<RefCell<Window>> {
     self.parent.clone()
   }
 
@@ -126,6 +124,22 @@ impl Window {
     self.sub_windows.remove(id);
   }
 
+  pub fn top(&self) -> u16 {
+    self.buffer.top()
+  }
+  
+  pub fn left(&self) -> u16 {
+    self.buffer.left()
+  }
+
+  pub fn bottom(&self) -> u16 {
+    self.buffer.bottom()
+  }
+
+  pub fn right(&self) -> u16 {
+    self.buffer.right()
+  }
+
   pub fn abs_pos(&self) -> (u16, u16) {
     let mut top = self.buffer.top();
     let mut left = self.buffer.left();
@@ -133,11 +147,12 @@ impl Window {
     let mut parent = self.get_parent();
 
     loop {
-      match parent {
+      match parent.upgrade() {
         Some(p) => {
+          let p = p.borrow();
           top += p.top();
           left += p.left();
-          parent = p.parent();
+          parent = p.get_parent();
         },
         None => { return (top, left) }
       }
@@ -146,6 +161,99 @@ impl Window {
 
   pub fn rel_pos(&self) -> (u16, u16) {
     (self.buffer.top(), self.buffer.left())
+  }
+
+  fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {
+    let (maxx, maxy) = (self.buffer.right(), self.buffer.bottom());
+    let mut endx = buf.width() as i16;
+    let mut endy = buf.height() as i16;
+    
+    if left + buf.width() > maxx {
+      endx -= ((left + buf.width()) - maxx) as i16;
+    }
+    if top + buf.height() > maxy {
+      endy -= ((top + buf.height()) - maxy) as i16;
+    }
+
+    if endx < 0 || endy < 0 {
+      return;
+    }
+
+    for y in 0..(endy as u16) {
+      for x in 0..(endx as u16) {
+        let a = self.buffer.get_mut(x + left, y + top);
+        let b = buf.get(x, y);
+
+        a.bg = b.bg;
+        a.fg = b.fg;
+        a.style = b.style;
+        if b.symbol != " " {
+          a.symbol = b.symbol.clone();
+        } 
+      }
+    }
+  }
+
+  pub fn render_window(&mut self, win: &Window) {
+    let (top, left) = win.rel_pos();
+    self.render_window_at(&win.buffer, top, left);
+  }
+
+  pub fn render_to_parent(&mut self) {
+    match self.parent.upgrade() {
+      Some(parent) => parent.borrow_mut().render_window(&self),
+      None => panic!("cannot call window.render_to_parent() on root window.")
+    }
+  }
+
+  pub fn render(&mut self) {
+    let mut parent = self.parent.clone();
+    let buf = &self.buffer;
+    let mut top = buf.top();
+    let mut left = buf.left();
+
+    loop {
+      match parent.upgrade() {
+        Some(p) => {
+          let mut p = p.borrow_mut();
+          parent = p.get_parent();
+          if parent.upgrade().is_none() {
+            p.render_window_at(&buf, top, left);
+            return;
+          }
+          top += p.top();
+          left += p.left();
+        },
+        None => panic!("cannot call window.render() on root window, instead call terminal.flush().")
+      }
+    }
+  }
+
+  pub fn is_root(&self) -> bool {
+    match self.parent.upgrade() {
+      Some(_) => false,
+      None => true
+    }
+  }
+
+  // can be optimized
+  pub fn render_children(&mut self) {
+    for child in &mut self.sub_windows {
+      child.render();
+    }
+  }
+
+  // can be optimized
+  pub fn render_deep(&mut self) {
+    for child in &mut self.sub_windows {
+      child.render();
+      child.render_deep();
+    }
+  }
+
+  pub fn render_element(&mut self, el: &dyn Element) {
+    self.draw_element(el);
+    self.render();
   }
 }
 
@@ -161,7 +269,7 @@ impl WindowRef {
     WindowRef(Rc::new(RefCell::new(Window {
       buffer: Buffer::empty(Rect::new(x, y, width, height)),
       sub_windows: vec![],
-      parent: None,
+      parent: Weak::new(),
       id: 0
     })))
   }
@@ -226,22 +334,22 @@ impl WindowRef {
   }
 
   pub fn top(&self) -> u16 {
-    self.inner().buffer.top()
+    self.inner().top()
   }
   
   pub fn left(&self) -> u16 {
-    self.inner().buffer.left()
+    self.inner().left()
   }
 
   pub fn bottom(&self) -> u16 {
-    self.inner().buffer.bottom()
+    self.inner().bottom()
   }
 
   pub fn right(&self) -> u16 {
-    self.inner().buffer.right()
+    self.inner().right()
   }
 
-  pub fn parent(&self) -> Option<WindowRef> {
+  pub fn parent(&self) -> Weak<RefCell<Window>> {
     self.inner().get_parent()
   }
 
@@ -259,10 +367,10 @@ impl WindowRef {
 
   pub fn delete(&mut self) {
     let id = self.id();
-    match self.parent() {
+    match self.parent().upgrade() {
       Some(p) => {
-        let mut p = p.0.borrow_mut();
-        p.parent = None;
+        let mut p = p.borrow_mut();
+        p.parent = Weak::new();
         p.delete_child_by_id(id);
       },
       None => ()
@@ -270,114 +378,31 @@ impl WindowRef {
   }
 
   fn render_window_at(&mut self, buf: &Buffer, top: u16, left: u16) {
-    let mut a = self.inner_mut();
-    let self_buf_mut = a.buffer_mut();
-
-    let (maxx, maxy) = (self_buf_mut.right(), self_buf_mut.bottom());
-    let mut endx = buf.width() as i16;
-    let mut endy = buf.height() as i16;
-    
-    if left + buf.width() > maxx {
-      endx -= ((left + buf.width()) - maxx) as i16;
-    }
-    if top + buf.height() > maxy {
-      endy -= ((top + buf.height()) - maxy) as i16;
-    }
-
-    if endx < 0 || endy < 0 {
-      return;
-    }
-
-    for y in 0..(endy as u16) {
-      for x in 0..(endx as u16) {
-        let a = self_buf_mut.get_mut(x + left, y + top);
-        let b = buf.get(x, y);
-
-        a.bg = b.bg;
-        a.fg = b.fg;
-        a.style = b.style;
-        if b.symbol != " " {
-          a.symbol = b.symbol.clone();
-        } 
-      }
-    }
+    self.inner_mut().render_window_at(buf, top, left);
   }
 
   pub fn render_window(&mut self, win: &WindowRef) {
-    let win = win.inner();
-    let buf = win.buffer();
-
-    let (top, left) = win.rel_pos();
-    self.render_window_at(buf, top, left);
+    self.inner_mut().render_window(&win.inner());
   }
 
   pub fn render_to_parent(&mut self) {
-    match self.parent() {
-      Some(mut parent) => parent.render_window(&self),
-      None => panic!("cannot call window.render_to_parent() on root window.")
-    }
+    self.inner_mut().render_to_parent();
   }
 
   pub fn render(&mut self) {
-    let mut parent = self.parent();
-    let w = self.inner();
-    let buf = w.buffer();
-    let mut top = buf.top();
-    let mut left = buf.left();
-
-    loop {
-      match parent {
-        Some(mut p) => {
-          parent = p.parent();
-          if parent.is_none() {
-            p.render_window_at(&buf, top, left);
-            return;
-          }
-          top += p.top();
-          left += p.left();
-        },
-        None => panic!("cannot call window.render() on root window, instead call terminal.flush().")
-      }
-    }
+    self.inner_mut().render();
   }
 
-  pub fn is_root(&self) -> bool {
-    match self.parent() {
-      Some(_) => false,
-      None => true
-    }
-  }
-
-  // can be optimized
   pub fn render_children(&mut self) {
-    let children = self.inner_mut().children();
-
-    if !self.is_root() {
-      self.render();
-    }
-
-    for mut child in children {
-      child.render();
-    }
+    self.inner_mut().render_children();
   }
 
-  // can be optimized
   pub fn render_deep(&mut self) {
-    let children = self.inner_mut().children();
-
-    if !self.is_root() {
-      self.render();
-    }
-
-    for mut child in children {
-      child.render();
-      child.render_deep();
-    }
+    self.inner_mut().render_deep();
   }
 
   pub fn render_element(&mut self, el: &dyn Element) {
-    self.draw_element(el);
-    self.render();
+    self.inner_mut().render_element(el);
   }
 
   pub fn read_string<W: Write>(&mut self, input_box: &mut InputBox, handler: &mut CrosstermHandler<W>) -> String {
