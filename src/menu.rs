@@ -66,7 +66,7 @@ impl <'a, T> Menu <'a, T> {
 
   pub fn run(&mut self, terminal: &mut Terminal<Stdout>, ctx: &mut T) -> Return {
     let mut menu_win = terminal.root.new_child(
-      Window::default().size(terminal.root.get_width(), (self.list.len() * 2 + 4) as u16)
+      Window::default().size(terminal.root.width(), (self.list.len() * 2 + 4) as u16)
     );
     let mut options_win = menu_win.new_child(
       Window::default().size(40, (self.list.len() * 2 - 1) as u16)

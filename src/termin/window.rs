@@ -72,6 +72,14 @@ impl Window {
     }
   }
 
+  pub fn width(&self) -> u16 {
+    self.buffer.width()
+  }
+  
+  pub fn height(&self) -> u16 {
+    self.buffer.height()
+  }
+
   pub fn position(mut self, x: u16, y: u16) -> Self {
     self.set_pos(Position::Coord(x, y));
     self
@@ -92,8 +100,12 @@ impl Window {
   }
 
   pub fn size(mut self, width: u16, height: u16) -> Self {
-    self.buffer = Buffer::empty(Rect::new(self.buffer.left(), self.buffer.top(), width, height));
+    self.set_size(width, height);
     self 
+  }
+
+  pub fn set_size(&mut self, width: u16, height: u16) {
+    self.buffer = Buffer::empty(Rect::new(self.buffer.left(), self.buffer.top(), width, height));
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {
@@ -325,11 +337,11 @@ impl WindowRef {
     self.inner_mut().clear();
   } 
 
-  pub fn get_width(&self) -> u16 {
+  pub fn width(&self) -> u16 {
     self.inner().buffer.width()
   }
 
-  pub fn get_height(&self) -> u16 {
+  pub fn height(&self) -> u16 {
     self.inner().buffer.height()
   }
 

@@ -41,27 +41,24 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   terminal.refresh().unwrap();
 
   let name = terminal.handle_input(|handler, root| -> String {
-    let mut outter = root.new_child(Window::default().size(60, 12).bg(Color::Green));
-    let mut input_win = outter.new_child(Window::default().size(50, 10).bg(Color::Red));
+    let mut input_win = root.new_child(Window::default().size(50, 10).bg(Color::Red));
     let mut heading = Text::default().text("Change Name");
     let label = Text::default().text("new name: ").position(0, 2);
     let mut input = InputBox::default()
-                    .max_len(20)
+                    .max_len(30)
                     .position(label.get_rect().x + label.get_rect().width, label.get_rect().y)
-                    .size(40, 1).start_text((0, 0));
+                    .size(20, 2).start_text((0, 0));
     
     heading.set_position(input_win.rect(), Center{h: true, v: false});
     
     input_win.set_position(Center{h: true, v: true});
     input_win.draw_element(&label);
     input_win.draw_element(&heading);
+    input_win.render();
 
-    outter.set_position(Center{h: true, v: true});
-    outter.render();
-    handler.draw_window(&root);
+    handler.draw_window(&root).unwrap();
 
     let new_name = input_win.read_string(&mut input, handler);
-    outter.delete();
     new_name
   });
 
