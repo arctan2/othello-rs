@@ -29,7 +29,9 @@ impl fmt::Debug for Window {
 
 #[derive(Debug)]
 pub enum Position {
-  Center{h: bool, v: bool},
+  CenterH,
+  CenterV,
+  CenterB,
   Coord(u16, u16)
 }
 
@@ -50,20 +52,17 @@ impl Window {
   pub fn set_pos(&mut self, pos: Position) {
     match pos {
       Position::Coord(x, y) => self.buffer.set_pos(x, y),
-      Position::Center { h, v } => {
+      _ => {
         match self.parent.upgrade() {
           Some(parent) => {
             let self_rect = self.buffer.rect();
             let (x, y) = parent.borrow().buffer.rect().get_center_start_pos(self.buffer.rect());
 
-            if h && v {
-              self.buffer.set_pos(x, y);
-            } else {
-              if h {
-                self.buffer.set_pos(x, self_rect.y);
-              } else {
-                self.buffer.set_pos(self_rect.x, y);
-              }
+            match pos {
+              Position::CenterH => self.buffer.set_pos(x, self_rect.y),
+              Position::CenterV => self.buffer.set_pos(self_rect.x, y),
+              Position::CenterB => self.buffer.set_pos(x, y),
+              _ => ()
             }
           },
           None => ()

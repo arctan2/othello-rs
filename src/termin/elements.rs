@@ -51,20 +51,33 @@ macro_rules! impl_setters {
       pub fn set_position(&mut self, rect: Rect, pos: Position) {
         match pos {
           Position::Coord(x, y) => self.set_xy(x, y),
-          Position::Center { h, v } => {
+          Position::CenterB | Position::CenterV | Position::CenterH => {
             let (x, y) = rect.get_center_start_pos(self.rect.clone());
 
-            if h && v {
-              self.set_xy(x, y);
-            } else {
-              if h {
-                self.set_xy(x, self.rect.y);
-              } else {
-                self.set_xy(self.rect.x, y);
-              }
+            match pos {
+              Position::CenterB => self.set_xy(x, y),
+              Position::CenterH => self.set_xy(x, self.rect.y),
+              Position::CenterV => self.set_xy(self.rect.x, y),
+              _ => ()
             }
           }
         }
+      }
+
+      pub fn width(&self) -> u16 {
+        self.rect.width
+      }
+
+      pub fn height(&self) -> u16 {
+        self.rect.width
+      }
+
+      pub fn x(&self) -> u16 {
+        self.rect.x
+      }
+
+      pub fn y(&self) -> u16 {
+        self.rect.y
       }
     }
   };

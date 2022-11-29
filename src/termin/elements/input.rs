@@ -6,6 +6,7 @@ use crate::termin::{buffer::{Rect, Buffer, Cell}, window::{WindowRef, Window, Po
 
 use super::{Text, Element};
 
+#[derive(Debug)]
 pub struct InputBox {
   start_text: (u16, u16),
   width: u16,
@@ -53,13 +54,15 @@ impl InputBox {
     execute!(stdout(), cursor::Show).unwrap();
     let mut cursor_pos: usize = 0;
     let mut input_win = win.new_child(
-      Window::default().position(self.x, self.y).size(self.width, self.height).bg(Color::Magenta)
+      Window::default().position(self.x, self.y).size(self.width, self.height)
     );
     let mut input_box = Text::default().size(self.width, self.height);
 
     let (abs_y, abs_x) = input_win.abs_pos();
 
     handler.draw_window(&input_win).unwrap();
+    let (rel_x, rel_y) = self.cursor_xy(input_win.width(), cursor_pos);
+    queue!(stdout(), cursor::MoveTo(abs_x + rel_x, abs_y + rel_y)).unwrap();
     handler.flush().unwrap();
 
     loop {

@@ -2,7 +2,7 @@ use std::{io::Stdout, thread, time::Duration};
 
 use crossterm::{style::Color, event::{Event, KeyCode}};
 
-use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::Center, WindowRef}};
+use crate::termin::{terminal_window::Terminal, elements::{Text, Rectangle}, window::{Window, Position::*, WindowRef}};
 
 pub struct Action <'a, T> {
   label: &'a str,
@@ -82,12 +82,12 @@ impl <'a, T> Menu <'a, T> {
 
     terminal.root.clear();
     run_routine(self, ctx);
-    options_win.set_position(Center{h: true, v: true});
+    options_win.set_position(CenterB);
 
-    self.heading.set_position(menu_win.rect(), Center { h: true, v: false });
+    self.heading.set_position(menu_win.rect(), CenterH);
     menu_win.draw_element(&self.heading);
 
-    menu_win.set_position(Center{h: false, v: true});
+    menu_win.set_position(CenterV);
     menu_win.set_xy_rel(0, -2);
       
     let return_val: Return;
@@ -110,7 +110,7 @@ impl <'a, T> Menu <'a, T> {
         opt.set_text(label);
         opt.set_fg(Color::Reset);
         opt.set_xy(0, (idx * 2) as u16);
-        opt.set_position(options_win.rect(), Center{h: true, v: false});
+        opt.set_position(options_win.rect(), CenterH);
 
         if idx == self.cursor as usize {
           let bg = Rectangle::from_rect(opt.get_rect()).bg(Color::Green);
@@ -175,7 +175,7 @@ impl <'a, T> Menu <'a, T> {
               }
               menu_win.clear();
               run_routine(self, ctx);
-              self.heading.set_position(menu_win.rect(), Center{h: true, v: false});
+              self.heading.set_position(menu_win.rect(), CenterH);
               menu_win.draw_element(&self.heading);
             },
             _ => ()

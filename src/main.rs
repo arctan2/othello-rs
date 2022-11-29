@@ -13,7 +13,7 @@ use crossterm::{
 use game::{Game, board};
 use menu::{Menu, Return};
 use termin::elements::{Rectangle, Text};
-use termin::window::{Window, Position::Center};
+use termin::window::{Window, Position::*};
 use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
@@ -41,17 +41,17 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   terminal.refresh().unwrap();
 
   let name = terminal.handle_input(|handler, root| -> String {
-    let mut input_win = root.new_child(Window::default().size(50, 10).bg(Color::Red));
+    let mut input_win = root.new_child(Window::default().size(50, 10));
     let mut heading = Text::default().text("Change Name");
     let label = Text::default().text("new name: ").position(0, 2);
     let mut input = InputBox::default()
-                    .max_len(30)
-                    .position(label.get_rect().x + label.get_rect().width, label.get_rect().y)
-                    .size(20, 2).start_text((0, 0));
+                    .max_len(20)
+                    .position(label.x() + label.width(), label.y())
+                    .size(21, 1).start_text((0, 0));
     
-    heading.set_position(input_win.rect(), Center{h: true, v: false});
-    
-    input_win.set_position(Center{h: true, v: true});
+    heading.set_position(input_win.rect(), CenterH);
+
+    input_win.set_xy_rel(2, 2);
     input_win.draw_element(&label);
     input_win.draw_element(&heading);
     input_win.render();
