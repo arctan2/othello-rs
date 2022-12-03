@@ -17,7 +17,7 @@ pub use input::InputBox;
 macro_rules! impl_setters {
   ($struct_name:ident) => {
     impl $struct_name {
-      pub fn position(mut self, x: u16, y: u16) -> Self {
+      pub fn xy(mut self, x: u16, y: u16) -> Self {
         self.rect.x = x;
         self.rect.y = y;
         self
@@ -26,6 +26,11 @@ macro_rules! impl_setters {
       pub fn size(mut self, width: u16, height: u16) -> Self {
         self.rect.width = width;
         self.rect.height = height;
+        self
+      }
+
+      pub fn xy_rel(mut self, mut dx: i16, mut dy: i16) -> Self {
+        self.set_xy_rel(dx, dy);
         self
       }
 
@@ -46,6 +51,11 @@ macro_rules! impl_setters {
       pub fn set_size(&mut self, width: u16, height: u16) {
         self.rect.width = width;
         self.rect.height = height;
+      }
+
+      pub fn position(mut self, rect: Rect, pos: Position) -> Self {
+        self.set_position(rect, pos);
+        self
       }
 
       pub fn set_position(&mut self, rect: Rect, pos: Position) {

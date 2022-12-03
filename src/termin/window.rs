@@ -5,7 +5,7 @@ use crossterm::style::Color;
 use crate::sleep;
 
 use super::{
-  elements::{Element, InputBox},
+  elements::{Element, InputBox, Text},
   buffer::{Rect, Buffer}, crossterm_handler::CrosstermHandler
 };
 
@@ -111,6 +111,12 @@ impl Window {
     el.draw(&mut self.buffer);
   }
 
+  pub fn draw_text(&mut self, text: &str, pos: Position) {
+    let mut t = Text::default().text(text);
+    t.set_position(self.buffer.rect(), pos);
+    self.draw_element(&t);
+  }
+
   pub fn buffer(&self) -> &Buffer {
     &self.buffer   
   }
@@ -197,7 +203,7 @@ impl Window {
 
         a.bg = b.bg;
         a.fg = b.fg;
-        a.style = b.style;
+        a.attr = b.attr;
         if b.symbol != " " {
           a.symbol = b.symbol.clone();
         } 
@@ -414,6 +420,10 @@ impl WindowRef {
 
   pub fn render_element(&mut self, el: &dyn Element) {
     self.inner_mut().render_element(el);
+  }
+
+  pub fn draw_text(&mut self, text: &str, pos: Position) {
+    self.inner_mut().draw_text(text, pos);
   }
 
   pub fn read_string<W: Write>(&mut self, input_box: &mut InputBox, handler: &mut CrosstermHandler<W>) -> String {

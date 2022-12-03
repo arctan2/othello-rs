@@ -54,7 +54,7 @@ impl Board {
     self.board_container.clear();
     let mut pos_x = 0;
     let mut pos_y = 0;
-    let mut cell = Rectangle::default().size(2, 1).position(pos_x, pos_y).bg(Color::Green);
+    let mut cell = Rectangle::default().size(2, 1).xy(pos_x, pos_y).bg(Color::Green);
 
     for row in self.board {
       pos_x = 0;

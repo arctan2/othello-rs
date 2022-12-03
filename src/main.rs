@@ -5,7 +5,7 @@ mod menu;
 use std::{time::Duration, io::Write};
 use std::thread;
 use std::io::{stdout};
-use crossterm::style::Color;
+use crossterm::style::{Color, Attribute};
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
   execute, cursor
@@ -24,36 +24,22 @@ fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
 
-fn game_loop<W: Write>(terminal: &mut Terminal<W>, mut game: Game) {
-  terminal.clear();
-  game.init_board();
-  game.render_board();
-  terminal.refresh().unwrap();
-  sleep(2000);
-}
-
-struct Ctx {
-  name: String
-}
-
 fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   terminal.root.clear();
   terminal.refresh().unwrap();
 
   let name = terminal.handle_input(|handler, root| -> String {
     let mut input_win = root.new_child(Window::default().size(50, 10));
-    let mut heading = Text::default().text("Change Name");
-    let label = Text::default().text("new name: ").position(0, 2);
+    let label = Text::default().text("new name: ").xy(0, 2);
     let mut input = InputBox::default()
                     .max_len(20)
                     .position(label.x() + label.width(), label.y())
                     .size(21, 1).start_text((0, 0));
     
-    heading.set_position(input_win.rect(), CenterH);
 
     input_win.set_xy_rel(2, 2);
     input_win.draw_element(&label);
-    input_win.draw_element(&heading);
+    input_win.draw_text("Change Name", CenterH);
     input_win.render();
 
     handler.draw_window(&root).unwrap();
@@ -64,6 +50,55 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
 
   ctx.name = name;
   Return::None
+}
+
+fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
+  terminal.clear();
+  let mut offline_win = terminal.root.new_child(Window::default().size(30, 10).bg(Color::Green));
+  let rect = offline_win.rect();
+  let mut white = Text::default().text("white").position(rect, CenterB).attr(Attribute::Underlined).fg(Color::White);
+  let mut black = Text::default().text("black").position(rect, CenterB).fg(Color::Black);
+
+  black.set_xy_rel(black.width() as i16, 1);
+  white.set_xy_rel(-(white.width() as i16), 1);
+
+  offline_win.draw_element(&Text::default()
+    .text("Play Offline")
+    .fg(Color::Black)
+    .attr(Attribute::Bold)
+    .position(rect, CenterH)
+    .xy_rel(0, 1)
+  );
+
+  offline_win.draw_element(&Text::default()
+    .text("Choose your side:")
+    .xy_rel(2, 4)
+    .fg(Color::Black)
+  );
+
+  offline_win.draw_element(&white);
+  offline_win.draw_element(&black);
+
+  offline_win.render();
+  terminal.refresh().unwrap();
+  sleep(2000);
+
+  white.set_attr(Attribute::Reset);
+  black.set_attr(Attribute::Underlined);
+
+  offline_win.draw_element(&white);
+  offline_win.draw_element(&black);
+
+  offline_win.render();
+  terminal.refresh().unwrap();
+  sleep(2000);
+
+  offline_win.delete();
+  Return::Back
+}
+
+struct Ctx {
+  name: String
 }
 
 fn main() {
@@ -83,11 +118,7 @@ fn main() {
           })
           .sub_menu("play game",
             Menu::<Ctx>::new("Play game")
-            .action("offline", &|terminal, _| -> Return {
-              let game = Game::new(terminal.root.clone());
-              game_loop(terminal, game);
-              Return::ToRoot
-            })
+            .action("offline", &offline)
             .back("back")
           )
           .action("change name", &change_name)

@@ -6,13 +6,13 @@ use crossterm::style::{Color, Attribute};
 pub struct Cell {
   pub bg: Color,
   pub fg: Color,
-  pub style: Attribute,
+  pub attr: Attribute,
   pub symbol: String
 }
 
 impl Default for Cell {
   fn default() -> Self {
-    Cell { bg: Color::Reset, fg: Color::Reset, style: Attribute::Reset, symbol: " ".into() }
+    Cell { bg: Color::Reset, fg: Color::Reset, attr: Attribute::Reset, symbol: " ".into() }
   }
 }
 
@@ -29,19 +29,19 @@ impl Cell {
     self.symbol = sym.to_string();
   }
 
-  pub fn set_style(&mut self, attr: Attribute) {
-    self.style = attr;
+  pub fn set_attr(&mut self, attr: Attribute) {
+    self.attr = attr;
   }
 
   pub fn reset(&mut self) {
     self.bg = Color::Reset;
     self.fg = Color::Reset;
     self.symbol = String::from(" ");
-    self.style = Attribute::Reset;
+    self.attr = Attribute::Reset;
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Rect {
   pub x: u16,
   pub y: u16,
@@ -174,7 +174,7 @@ impl Buffer {
   }
 
   pub fn rect(&self) -> Rect {
-    self.rect.clone()
+    self.rect
   }
 
   pub fn to_vec(&self, abs: (u16, u16)) -> Vec<(u16, u16, &Cell)> {

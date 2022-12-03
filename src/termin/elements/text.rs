@@ -1,9 +1,10 @@
-use crossterm::style::Color;
+use crossterm::style::{Color, Attribute};
 use super::{Buffer, Rect, Element, impl_setters, Position};
 
 pub struct Text {
   rect: Rect,
   fg: Color,
+  attr: Attribute,
   text: String,
   start_text: (u16, u16)
 }
@@ -14,13 +15,14 @@ impl Text {
     Self {
       rect: Rect::new(x, y, width, height),
       fg: Color::Reset,
+      attr: Attribute::Reset,
       text: String::from(""),
       start_text: (0, 0)
     }
   }
 
   pub fn get_rect(&self) -> Rect {
-    self.rect.clone()
+    self.rect
   }
 
   pub fn fg(mut self, fg: Color) -> Self {
@@ -78,6 +80,15 @@ impl Text {
     self.text.remove(idx);
   }
 
+  pub fn attr(mut self, attr: Attribute) -> Self {
+    self.set_attr(attr);
+    self
+  }
+
+  pub fn set_attr(&mut self, attr: Attribute) {
+    self.attr = attr;
+  }
+
   pub fn get_text(&self) -> &str {
     &self.text
   }
@@ -101,7 +112,10 @@ impl Element for Text {
       c.set_fg(self.fg);
 
       match text.next() {
-        Some(sym) => c.set_symbol(sym),
+        Some(sym) => {
+          c.set_symbol(sym);
+          c.set_attr(self.attr);
+        },
         None => ()
       }
     };

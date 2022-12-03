@@ -6,7 +6,7 @@ use crossterm::{
   cursor::MoveTo, event::{read, Event}
 };
 
-use super::{window::WindowRef, elements::Element};
+use super::window::WindowRef;
 
 pub struct CrosstermHandler <W: Write> {
   buffer: W
@@ -44,6 +44,11 @@ where W: Write {
       }
       last_pos = Some((x, y));
 
+      if style != cell.attr {
+        queue!(self.buffer, SetAttribute(cell.attr), SetBackgroundColor(bg), SetForegroundColor(fg))?;
+        style = cell.attr;
+      }
+
       if bg != cell.bg {
         queue!(self.buffer, SetBackgroundColor(cell.bg))?;
         bg = cell.bg;
@@ -54,10 +59,6 @@ where W: Write {
         fg = cell.fg;
       }
 
-      if style != cell.style {
-        queue!(self.buffer, SetAttribute(cell.style))?;
-        style = cell.style;
-      }
       queue!(self.buffer, Print(&cell.symbol))?;
     }
 
@@ -66,7 +67,7 @@ where W: Write {
       SetForegroundColor(Color::Reset),
       SetBackgroundColor(Color::Reset),
       SetAttribute(Attribute::Reset)
-    ).unwrap();
+    )?;
 
     Ok(())
   }
