@@ -430,3 +430,11 @@ impl WindowRef {
     input_box.read_string(self, handler)
   }
 }
+
+macro_rules! draw_elements {
+  ($win:ident,$($el:expr),+) => {       
+    $($win.draw_element(&$el);)+
+  };
+}
+
+pub(crate) use draw_elements;

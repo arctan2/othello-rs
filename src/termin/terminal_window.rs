@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use crossterm::event::Event;
+use crossterm::event::{Event, KeyEvent, KeyCode};
 
 use super::{crossterm_handler::CrosstermHandler, window::{Window, WindowRef}};
 
@@ -19,6 +19,15 @@ impl <W: Write> Terminal<W> {
 
   pub fn event(&self) -> Event {
     self.handler.event()
+  }
+
+  pub fn getch(&self) -> KeyCode {
+    loop {
+      match self.event() {
+        Event::Key(k) => return k.code,
+        _ => ()
+      }
+    }
   }
 
   pub fn refresh(&mut self) -> io::Result<()> {

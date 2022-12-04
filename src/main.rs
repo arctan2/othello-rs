@@ -5,6 +5,7 @@ mod menu;
 use std::{time::Duration, io::Write};
 use std::thread;
 use std::io::{stdout};
+use crossterm::event::KeyCode;
 use crossterm::style::{Color, Attribute};
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -13,7 +14,7 @@ use crossterm::{
 use game::{Game, board};
 use menu::{Menu, Return};
 use termin::elements::{Rectangle, Text};
-use termin::window::{Window, Position::*};
+use termin::window::{Window, Position::*, draw_elements};
 use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
@@ -54,47 +55,64 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
 
 fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   terminal.clear();
-  let mut offline_win = terminal.root.new_child(Window::default().size(30, 10).bg(Color::Green));
+  let mut offline_win = terminal.root.new_child(Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }));
   let rect = offline_win.rect();
+  let mut cur_side = 'w';
   let mut white = Text::default().text("white").position(rect, CenterB).attr(Attribute::Underlined).fg(Color::White);
   let mut black = Text::default().text("black").position(rect, CenterB).fg(Color::Black);
 
   black.set_xy_rel(black.width() as i16, 1);
   white.set_xy_rel(-(white.width() as i16), 1);
 
-  offline_win.draw_element(&Text::default()
-    .text("Play Offline")
-    .fg(Color::Black)
-    .attr(Attribute::Bold)
-    .position(rect, CenterH)
-    .xy_rel(0, 1)
+  draw_elements!(offline_win,
+    Text::default()
+      .text("Play Offline")
+      .fg(Color::Black)
+      .attr(Attribute::Bold)
+      .position(rect, CenterH)
+      .xy_rel(0, 1),
+    Text::default()
+      .text("Choose your side:")
+      .xy_rel(2, 4)
+      .fg(Color::Black),
+    white, black
   );
-
-  offline_win.draw_element(&Text::default()
-    .text("Choose your side:")
-    .xy_rel(2, 4)
-    .fg(Color::Black)
-  );
-
-  offline_win.draw_element(&white);
-  offline_win.draw_element(&black);
 
   offline_win.render();
   terminal.refresh().unwrap();
-  sleep(2000);
 
-  white.set_attr(Attribute::Reset);
-  black.set_attr(Attribute::Underlined);
-
-  offline_win.draw_element(&white);
-  offline_win.draw_element(&black);
-
-  offline_win.render();
-  terminal.refresh().unwrap();
-  sleep(2000);
+  loop {
+    let mut do_render = false;
+    match terminal.getch() {
+      KeyCode::Left | KeyCode::Right => {
+        match cur_side {
+          'w' => {
+            black.set_attr(Attribute::Underlined);
+            white.set_attr(Attribute::Reset);
+            cur_side = 'b';
+            do_render = true;
+          },
+          'b' => {
+            white.set_attr(Attribute::Underlined);
+            black.set_attr(Attribute::Reset);
+            cur_side = 'w';
+            do_render = true;
+          },
+          _ => ()
+        }
+      },
+      KeyCode::Enter => break,
+      _ => ()
+    }
+    if do_render {
+      draw_elements!(offline_win, white, black);
+      terminal.handler.draw_window(&offline_win).unwrap();
+      terminal.flush().unwrap();
+    }
+  }
 
   offline_win.delete();
-  Return::Back
+  Return::ToRoot
 }
 
 struct Ctx {

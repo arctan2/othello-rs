@@ -35,7 +35,7 @@ where W: Write {
   {
     let mut bg = Color::Reset;
     let mut fg = Color::Reset;
-    let mut style = Attribute::Reset;
+    let mut attr = Attribute::Reset;
     let mut last_pos: Option<(u16, u16)>= None;
 
     for (x, y, cell) in content {
@@ -44,9 +44,9 @@ where W: Write {
       }
       last_pos = Some((x, y));
 
-      if style != cell.attr {
+      if attr != cell.attr {
         queue!(self.buffer, SetAttribute(cell.attr), SetBackgroundColor(bg), SetForegroundColor(fg))?;
-        style = cell.attr;
+        attr = cell.attr;
       }
 
       if bg != cell.bg {
