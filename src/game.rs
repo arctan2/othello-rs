@@ -1,11 +1,14 @@
 pub mod board;
+pub mod offline;
+
+use std::io::Write;
 
 use board::Board;
-use crossterm::style::Color;
+use crossterm::{style::Color, event::KeyCode};
 
-use crate::termin::{window::{WindowRef, Window, Position::Coord}};
+use crate::termin::{window::{WindowRef, Window, Position::Coord}, terminal_window::Terminal};
 
-use self::board::{BLACK, WHITE};
+use self::board::{BLACK, WHITE, UP, FIX, DOWN, LEFT, RIGHT};
 
 pub struct Game {
 	pub board: Board,
@@ -19,9 +22,9 @@ pub struct Game {
 }
 
 impl Game {
-	pub fn new(mut root_win: WindowRef) -> Self {
+	pub fn new(mut win: WindowRef) -> Self {
 		let (width, height) = (32 - 2, 15);
-		let mut board_container = root_win.new_child(
+		let mut board_container = win.new_child(
 			Window::default().size(width + 4, height + 2).bg(Color::Green)
 		);
 		let board = board_container.new_child(
@@ -40,5 +43,21 @@ impl Game {
 	pub fn render_board(&mut self) {
 		self.board.board_container.clear();
 		self.board.render();
+	}
+
+	pub fn enable_cursor_movement<W: Write>(&mut self, terminal: &mut Terminal<W>) {
+		loop {
+			match terminal.getch() {
+				KeyCode::Up => self.board.move_cursor_rel(FIX, UP),
+				KeyCode::Down => self.board.move_cursor_rel(FIX, DOWN),
+				KeyCode::Left => self.board.move_cursor_rel(LEFT, FIX),
+				KeyCode::Right => self.board.move_cursor_rel(RIGHT, FIX),
+				KeyCode::Enter => break,
+				_ => ()
+			}
+			self.board.render_cursor();
+			self.board.render();
+			terminal.refresh().unwrap();
+		}
 	}
 }

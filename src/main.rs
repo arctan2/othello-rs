@@ -19,6 +19,7 @@ use termin::{
   crossterm_handler::CrosstermHandler, terminal_window::Terminal,
 };
 
+use crate::game::offline::Offline;
 use crate::termin::elements::InputBox;
 
 fn sleep(ms: u64) {
@@ -53,9 +54,11 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   Return::None
 }
 
-fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
+fn offline<W: Write>(terminal: &mut Terminal<W>, _: &mut Ctx, no_of_players: u8) -> Return {
   terminal.clear();
-  let mut offline_win = terminal.root.new_child(Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }));
+  let mut offline_win = terminal.root.new_child(
+    Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }).position(2, 2)
+  );
   let rect = offline_win.rect();
   let mut cur_side = 'w';
   let mut white = Text::default().text("white").position(rect, CenterB).attr(Attribute::Underlined).fg(Color::White);
@@ -72,7 +75,7 @@ fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
       .position(rect, CenterH)
       .xy_rel(0, 1),
     Text::default()
-      .text("Choose your side:")
+      .text(if no_of_players == 1 { "Choose your side:" } else { "Choose Player 1 side: " })
       .xy_rel(2, 4)
       .fg(Color::Black),
     white, black
@@ -102,6 +105,10 @@ fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
         }
       },
       KeyCode::Enter => break,
+      KeyCode::Esc => {
+        offline_win.delete();
+        return Return::None
+      }
       _ => ()
     }
     if do_render {
@@ -112,6 +119,19 @@ fn offline<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
   }
 
   offline_win.delete();
+
+  use game::offline::ParticipantType::{Player, Bot};
+
+  if no_of_players == 2 {
+    Offline{black: Player, white: Player}
+  } else {
+    if cur_side == 'w' {
+      Offline { black: Bot, white: Player }
+    } else {
+      Offline { black: Player, white: Bot }
+    }
+  }.begin_game(terminal);
+
   Return::ToRoot
 }
 
@@ -136,7 +156,22 @@ fn main() {
           })
           .sub_menu("play game",
             Menu::<Ctx>::new("Play game")
-            .action("offline", &offline)
+            .sub_menu("offline", 
+              Menu::<Ctx>::new("Offline")
+              .action("1 player", &|terminal, ctx| -> Return {
+                offline(terminal, ctx, 1)
+              })
+              .action("2 player", &|terminal, ctx| -> Return {
+                offline(terminal, ctx, 2)
+              })
+              .back("back")
+            )
+            .sub_menu("online", 
+              Menu::<Ctx>::new("Online")
+              .action("", &|terminal, ctx| -> Return {
+                Return::All
+              })
+            )
             .back("back")
           )
           .action("change name", &change_name)

@@ -5,11 +5,11 @@ use crate::termin::{window::WindowRef, elements::{Rectangle, Text}};
 pub const BLACK: char = 'b';
 pub const WHITE: char = 'w';
 
-const LEFT: i8 = -1;
-const right: i8= 1;
-const UP: i8  = -1;
-const DOWN: i8  = 1;
-const FIX: i8 = 0;
+pub const LEFT: i8 = -1;
+pub const RIGHT: i8= 1;
+pub const UP: i8  = -1;
+pub const DOWN: i8  = 1;
+pub const FIX: i8 = 0;
 
 type Side = char;
 
@@ -30,11 +30,11 @@ const TRAV_ARR: [[i8; 2]; 8] = [
 	[UP, FIX],
 	[DOWN, FIX],
 	[FIX, LEFT],
-	[FIX, right],
-	[UP, right],
+	[FIX, RIGHT],
+	[UP, RIGHT],
 	[UP, LEFT],
 	[DOWN, LEFT],
-	[DOWN, right],
+	[DOWN, RIGHT],
 ];
 
 impl Board {
@@ -92,6 +92,21 @@ impl Board {
     self.cursor.y = y;
   }
 
+  pub fn move_cursor_rel(&mut self, x: i8, y: i8) {
+    let mut new_x = x + self.cursor.x as i8;
+    let mut new_y = y + self.cursor.y as i8;
+    if new_x < 0 { new_x = 7; }
+    if new_y < 0 { new_y = 7; }
+    if new_x > 7 { new_x = 0; }
+    if new_y > 7 { new_y = 0; }
+    self.cursor.x = new_x as u16;
+    self.cursor.y = new_y as u16;
+  }
+
+  pub fn cursor_xy(&self) -> (u16, u16) {
+    (self.cursor.x, self.cursor.y)
+  }
+
   pub fn traverse_from(&self, init_row: i8, init_col: i8, v_dir: i8, h_dir: i8, my_side: Side, opponent_side: Side) -> bool  {
     let mut row = init_row + v_dir;
     let mut col = init_col + h_dir;
@@ -127,21 +142,21 @@ impl Board {
   }
 
   pub fn traverse_and_flip(&mut self, i: i8, j: i8, my_side: Side, opponent_side: Side) -> bool {
-    let mut isFlipped = false;
+    let mut is_flipped = false;
 
     for d in TRAV_ARR {
       let f = self.traverse_from(i, j, d[0], d[1], my_side, opponent_side);
       if f {
         self.flip_from(i, j, d[0], d[1], opponent_side, my_side);
       }
-      isFlipped = f || isFlipped;
+      is_flipped = f || is_flipped;
     }
 
-    if isFlipped {
+    if is_flipped {
       self.board[i as usize][j as usize] = my_side;
     }
 
-    return isFlipped;
+    return is_flipped;
   }
 
   pub fn has_possible_moves(&mut self, my_side: Side, opponent_side: Side) -> bool {
