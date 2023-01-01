@@ -6,15 +6,15 @@ use std::io::Write;
 use board::Board;
 use crossterm::{style::Color, event::KeyCode};
 
-use crate::termin::{window::{WindowRef, Window, Position::Coord}, terminal_window::Terminal};
+use crate::termin::{window::{WindowRef, Window, Position::Coord}, terminal_window::Terminal, elements::Rectangle};
 
-use self::board::{BLACK, WHITE, UP, FIX, DOWN, LEFT, RIGHT};
+use self::board::{BLACK, WHITE, UP, FIX, DOWN, LEFT, RIGHT, Side};
 
 pub struct Game {
 	pub board: Board,
 	// blackSide: ,
 	// whiteSide: ,
-	// curTurnRune: ,
+	cur_turn_side: Side,
 	// gameState: ,
 	// gameName: ,
 	// stopDestructChan: ,
@@ -30,7 +30,7 @@ impl Game {
 		let board = board_container.new_child(
 			Window::default().size(32 - 2, 15).position(2, 1).bg(Color::Green)
 		);
-		Self { board: Board::new(board_container, board) }
+		Self { board: Board::new(board_container, board), cur_turn_side: WHITE }
 	}
 
   pub fn init_board(&mut self) {
@@ -45,6 +45,21 @@ impl Game {
 		self.board.render();
 	}
 
+	pub fn render_available_moves(&mut self) {
+		let mut b = Rectangle::default().bg(Color::Red).size(2, 1);
+
+		for (row_idx, row) in &self.board.available_moves {
+			for col_idx in row {
+				let x = col_idx * 4 + 2;
+				let y = row_idx * 2 + 1;
+				b.set_xy(x as u16, y as u16);
+				self.board.board_container.draw_element(&b);
+			}
+		}
+
+		self.board.board_container.render();
+	}
+
 	pub fn enable_cursor_movement<W: Write>(&mut self, terminal: &mut Terminal<W>) {
 		loop {
 			match terminal.getch() {
@@ -55,8 +70,8 @@ impl Game {
 				KeyCode::Enter => break,
 				_ => ()
 			}
-			self.board.render_cursor();
 			self.board.render();
+			self.render_available_moves();
 			terminal.refresh().unwrap();
 		}
 	}

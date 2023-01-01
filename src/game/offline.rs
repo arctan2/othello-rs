@@ -1,8 +1,8 @@
 use std::io::Write;
 
-use crate::termin::{terminal_window::Terminal, window::Window};
+use crate::{termin::{terminal_window::Terminal, window::Window}, sleep};
 
-use super::Game;
+use super::{Game, board::WHITE};
 
 pub enum ParticipantType {
   Bot,
@@ -22,6 +22,8 @@ impl Offline {
     let mut game = Game::new(offline_win.clone());
     game.init_board();
     game.render_board();
+    game.board.calc_available_moves(WHITE);
+    game.render_available_moves();
     terminal.refresh().unwrap();
 
     game.enable_cursor_movement(terminal);
