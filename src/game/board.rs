@@ -26,8 +26,8 @@ pub struct Board {
   pub board: [[Side; 8]; 8],
   pub board_container: WindowRef,
   pub board_win: WindowRef,
-  black_points: u8,
-  white_points: u8,
+  pub black_points: u8,
+  pub white_points: u8,
   cursor: Cursor,
   pub available_moves: HashMap<usize, Vec<usize>>
 }
@@ -59,7 +59,6 @@ impl Board {
   }
 
   pub fn render(&mut self) {
-    self.board_container.clear();
     let mut pos_x = 0;
     let mut pos_y = 0;
     let mut cell = Rectangle::default().size(2, 1).xy(pos_x, pos_y).bg(Color::Green);
@@ -84,8 +83,13 @@ impl Board {
     }
 
     self.board_win.render_to_parent();
-    self.render_cursor();
-    self.board_container.render();
+  }
+
+  pub fn place_cursor_on_legal_position(&mut self) {
+    let row_idx = self.available_moves.keys().next().unwrap_or(&0);
+    let col_idx = self.available_moves.get(row_idx).unwrap_or(&vec![0])[0];
+    
+    self.move_cursor(col_idx as u16, *row_idx as u16);
   }
 
   pub fn render_cursor(&mut self) {
@@ -101,36 +105,46 @@ impl Board {
   }
 
   pub fn move_cursor_rel(&mut self, dx: i8, dy: i8) {
-    let mut new_x = self.cursor.x as i8;
-    let mut new_y = self.cursor.y as i8;
-    if dx == FIX {
-      loop {
-        new_y += dy;
-        if new_y < 0 { new_y = 7; }
-        else if new_y > 7 { new_y = 0; }
+    let mut row_idx = self.cursor.y as i8;
+    let row = self.available_moves.get(&(row_idx as usize)).unwrap();
+    let mut col_idx = row.iter().position(|x| *x == (self.cursor.x as usize)).unwrap() as i8;
 
-        if self.board[new_y as usize][new_x as usize] == EMPTY { break; }
-      }
-    } else {
-      loop {
-        new_x += dx;
-        if new_x < 0 { new_x = 7; new_y -= 1; }
-        else if new_x > 7 { new_x = 0; new_y += 1; }
-        if new_y < 0 { new_y = 7; }
-        else if new_y > 7 { new_y = 0; }
-
-        if self.board[new_y as usize][new_x as usize] == EMPTY { break; }
+    if dy == FIX {
+      col_idx += dx;
+      if col_idx < 0 { 
+        loop {
+          row_idx -= 1;
+          if row_idx < 0 {
+            row_idx = 7;
+          }
+          if self.available_moves.contains_key(&(row_idx as usize)) {
+            col_idx = self.available_moves.get(&(row_idx as usize)).unwrap().len() as i8 - 1;
+            break;
+          }
+        }
+      } else if col_idx >= row.len() as i8 {
+        loop {
+          row_idx += 1;
+          if row_idx > 7 {
+            row_idx = 0;
+          }
+          if self.available_moves.contains_key(&(row_idx as usize)) {
+            col_idx = 0;
+            break;
+          }
+        }
       }
     }
-    self.cursor.x = new_x as u16;
-    self.cursor.y = new_y as u16;
+
+    self.cursor.x = self.available_moves.get(&(row_idx as usize)).unwrap()[col_idx as usize] as u16;
+    self.cursor.y = row_idx as u16;
   }
 
   pub fn cursor_xy(&self) -> (u16, u16) {
     (self.cursor.x, self.cursor.y)
   }
 
-  pub fn traverse_from<'a>(&mut self, 
+  pub fn traverse_from(&mut self, 
     init_row: i8, init_col: i8,
     v_dir: i8, h_dir: i8,
     my_side: Side, opponent_side: Side
@@ -169,13 +183,18 @@ impl Board {
     flipped_count
   }
 
-  pub fn traverse_and_flip(&mut self, i: i8, j: i8, my_side: Side, opponent_side: Side) -> bool {
+  fn opponent_of(&self, p: Side) -> Side {
+    if p == WHITE { BLACK } else { WHITE }
+  }
+
+  pub fn traverse_and_flip(&mut self, i: i8, j: i8, my_side: Side, opponent_side: Side) -> (bool, usize) {
     let mut is_flipped = false;
+    let mut flipped_count = 0;
 
     for d in TRAV_ARR {
       let (f, _, _) = self.traverse_from(i, j, d.0, d.1, my_side, opponent_side);
       if f {
-        self.flip_from(i, j, d.0, d.1, opponent_side, my_side);
+        flipped_count = self.flip_from(i, j, d.0, d.1, opponent_side, my_side);
       }
       is_flipped = f || is_flipped;
     }
@@ -184,7 +203,27 @@ impl Board {
       self.board[i as usize][j as usize] = my_side;
     }
 
-    return is_flipped;
+    return (is_flipped, flipped_count);
+  }
+
+  pub fn set_points(&mut self, b: u8, w: u8) {
+    self.black_points = b;
+    self.white_points = w;
+  }
+
+  pub fn play_move(&mut self, cur_turn: Side) {
+    let opponent_side = self.opponent_of(cur_turn);
+    let (cx, cy) = self.cursor_xy();
+    self.board[cy as usize][cx as usize] = cur_turn;
+    let (has_flipped, flipped_count) = self.traverse_and_flip(cy as i8, cx as i8, cur_turn, opponent_side);
+    if !has_flipped { self.board[cy as usize][cx as usize] = EMPTY; }
+    if flipped_count != 0 {
+      if cur_turn == BLACK {
+        self.set_points(self.black_points + flipped_count as u8 + 1, self.white_points - flipped_count as u8);
+      } else {
+        self.set_points(self.black_points - flipped_count as u8, self.white_points + flipped_count as u8 + 1);
+      }
+    }
   }
 
   pub fn has_possible_moves(&mut self, my_side: Side, opponent_side: Side) -> bool {
@@ -205,26 +244,8 @@ impl Board {
     return false;
   }
 
-  // fn traverse_all(&mut self,
-    // i:usize, j:usize,
-    // mySide:Side, opponentSide:Side,
-  // ) -> (bool,usize) {
-    // let mut has_flipped = false;
-    // let mut is_f: bool;
-    // let mut flipped_count: usize = 0;
-
-    // for (vertic, horiz) in TRAV_ARR {
-      // is_f = self.traverse_from(i as i8, j as i8, vertic, horiz, mySide, opponentSide);
-      // if is_f {
-        // flipped_count += self.flip_from(i as i8, j as i8, vertic, horiz, mySide, opponentSide);
-      // }
-      // has_flipped = is_f || has_flipped;
-    // }
-    // return (has_flipped, flipped_count);
-  // }
-
   pub fn calc_available_moves(&mut self, for_side: Side) {
-    let opponent_side = if for_side == BLACK { WHITE } else { BLACK };
+    let opponent_side = self.opponent_of(for_side);
     let mut available_moves: HashMap<usize, Vec<usize>> = HashMap::new();
 
     for i in 0..self.board.len() {
@@ -235,7 +256,11 @@ impl Board {
 
           if f {
             match available_moves.get_mut(&r) {
-              Some(row) => row.push(c),
+              Some(row) => {
+                if !row.contains(&c) {
+                  row.push(c);
+                }
+              },
               None => { available_moves.insert(r, vec![c]); }
             }
           }

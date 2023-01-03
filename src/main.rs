@@ -123,7 +123,7 @@ fn offline<W: Write>(terminal: &mut Terminal<W>, _: &mut Ctx, no_of_players: u8)
   use game::offline::ParticipantType::{Player, Bot};
 
   if no_of_players == 2 {
-    Offline{black: Player, white: Player}
+    Offline{ black: Player, white: Player }
   } else {
     if cur_side == 'w' {
       Offline { black: Bot, white: Player }

@@ -15,6 +15,9 @@ pub struct Game {
 	// blackSide: ,
 	// whiteSide: ,
 	cur_turn_side: Side,
+	render_cursor: bool,
+	render_available_moves: bool,
+	is_over: bool,
 	// gameState: ,
 	// gameName: ,
 	// stopDestructChan: ,
@@ -30,7 +33,13 @@ impl Game {
 		let board = board_container.new_child(
 			Window::default().size(32 - 2, 15).position(2, 1).bg(Color::Green)
 		);
-		Self { board: Board::new(board_container, board), cur_turn_side: WHITE }
+		Self {
+			is_over: false,
+			board: Board::new(board_container, board),
+			cur_turn_side: WHITE,
+			render_cursor: false,
+			render_available_moves: false
+		}
 	}
 
   pub fn init_board(&mut self) {
@@ -38,11 +47,22 @@ impl Game {
     self.board.board[3][4] = WHITE;
     self.board.board[4][3] = WHITE;
     self.board.board[4][4] = BLACK;
+		self.board.move_cursor(3, 2);
+		self.board.black_points = 2;
+		self.board.white_points = 2;
   }
 
 	pub fn render_board(&mut self) {
 		self.board.board_container.clear();
 		self.board.render();
+		if self.render_available_moves {
+			self.render_available_moves();
+		}
+		if self.render_cursor {
+			self.board.render_cursor();
+		}
+
+		self.board.board_container.render();
 	}
 
 	pub fn render_available_moves(&mut self) {
@@ -60,19 +80,32 @@ impl Game {
 		self.board.board_container.render();
 	}
 
+	pub fn play_move(&mut self) {
+		self.board.play_move(self.cur_turn_side);
+	}
+
 	pub fn enable_cursor_movement<W: Write>(&mut self, terminal: &mut Terminal<W>) {
+		self.render_cursor = true;
+		self.render_available_moves = true;
+		self.render_board();
+		terminal.refresh().unwrap();
 		loop {
 			match terminal.getch() {
 				KeyCode::Up => self.board.move_cursor_rel(FIX, UP),
 				KeyCode::Down => self.board.move_cursor_rel(FIX, DOWN),
 				KeyCode::Left => self.board.move_cursor_rel(LEFT, FIX),
 				KeyCode::Right => self.board.move_cursor_rel(RIGHT, FIX),
-				KeyCode::Enter => break,
+				KeyCode::Enter => {
+					self.play_move();
+					break;
+				},
+				KeyCode::Esc => break,
 				_ => ()
 			}
-			self.board.render();
-			self.render_available_moves();
+			self.render_board();
 			terminal.refresh().unwrap();
 		}
+		self.render_cursor = false;
+		self.render_available_moves = false;
 	}
 }
