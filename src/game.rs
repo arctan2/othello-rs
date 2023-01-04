@@ -108,4 +108,10 @@ impl Game {
 		self.render_cursor = false;
 		self.render_available_moves = false;
 	}
+
+	pub fn check_is_over(&mut self) {
+		if !self.board.has_possible_moves(WHITE) || !self.board.has_possible_moves(BLACK) {
+			self.is_over = true;
+		}
+	}
 }

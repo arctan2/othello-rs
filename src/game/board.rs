@@ -226,7 +226,9 @@ impl Board {
     }
   }
 
-  pub fn has_possible_moves(&mut self, my_side: Side, opponent_side: Side) -> bool {
+  pub fn has_possible_moves(&mut self, my_side: Side) -> bool {
+    let opponent_side = self.opponent_of(my_side);
+
     for i in 0..self.board.len() {
       for j in 0..self.board[i].len() {
         if self.board[i][j] != my_side {

@@ -35,8 +35,12 @@ impl Offline {
       match cur_turn {
         ParticipantType::Player => {
           game.board.calc_available_moves(game.cur_turn_side);
-          game.board.place_cursor_on_legal_position();
-          game.enable_cursor_movement(terminal);
+          if !game.board.available_moves.is_empty() {
+            game.board.place_cursor_on_legal_position();
+            game.enable_cursor_movement(terminal);
+          } else {
+            sleep(1000);
+          }
 
           game.cur_turn_side = if game.cur_turn_side == WHITE { BLACK } else { WHITE };
           cur_turn = if game.cur_turn_side == WHITE { self.white } else { self.black };
@@ -44,20 +48,26 @@ impl Offline {
         ParticipantType::Bot => {
           game.render_board();
           terminal.refresh().unwrap();
-          sleep(2000);
 
           game.board.calc_available_moves(game.cur_turn_side);
 
-          let rand_row = rand_item_from_vec(&game.board.available_moves.keys().collect());
-          let rand_col = rand_item_from_vec(game.board.available_moves.get(rand_row).unwrap());
+          if !game.board.available_moves.is_empty() {
+            let rand_row = rand_item_from_vec(&game.board.available_moves.keys().collect());
+            let rand_col = rand_item_from_vec(game.board.available_moves.get(rand_row).unwrap());
 
-          game.board.move_cursor(rand_col as u16, *rand_row as u16);
+            game.board.move_cursor(rand_col as u16, *rand_row as u16);
 
-          game.play_move();
+            sleep(2000);
+            game.play_move();
+          } else {
+            sleep(1000);
+          }
+
           game.cur_turn_side = if game.cur_turn_side == WHITE { BLACK } else { WHITE };
           cur_turn = if game.cur_turn_side == WHITE { self.white } else { self.black };
         }
       }
+      game.check_is_over();
       game.render_board();
       terminal.refresh().unwrap();
     }
