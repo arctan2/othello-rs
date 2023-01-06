@@ -204,9 +204,7 @@ impl Window {
         a.bg = b.bg;
         a.fg = b.fg;
         a.attr = b.attr;
-        if b.symbol != " " {
-          a.symbol = b.symbol.clone();
-        } 
+        a.symbol = b.symbol.clone();
       }
     }
   }

@@ -6,7 +6,7 @@ use std::io::Write;
 use board::Board;
 use crossterm::{style::Color, event::KeyCode};
 
-use crate::termin::{window::{WindowRef, Window, Position::Coord}, terminal_window::Terminal, elements::Rectangle};
+use crate::termin::{window::{WindowRef, Window, Position::Coord}, terminal_window::Terminal, elements::{Rectangle, Text}};
 
 use self::board::{BLACK, WHITE, UP, FIX, DOWN, LEFT, RIGHT, Side};
 
@@ -15,6 +15,7 @@ pub struct Game {
 	// blackSide: ,
 	// whiteSide: ,
 	cur_turn_side: Side,
+	cur_turn_side_win: WindowRef,
 	render_cursor: bool,
 	render_available_moves: bool,
 	is_over: bool,
@@ -28,14 +29,20 @@ impl Game {
 	pub fn new(mut win: WindowRef) -> Self {
 		let (width, height) = (32 - 2, 15);
 		let mut board_container = win.new_child(
-			Window::default().size(width + 4, height + 2).bg(Color::Green)
+			Window::default().size(width + 4, height + 2).bg(Color::Green).position(1, 4)
 		);
 		let board = board_container.new_child(
 			Window::default().size(32 - 2, 15).position(2, 1).bg(Color::Green)
 		);
+		let points_win = win.new_child(
+			Window::default().size(30, 1).position(0, board_container.top() + board_container.height() + 2)
+		);
+		let cur_turn_side_win = win.new_child(Window::default().size(20, 1).position(1, 1));
+
 		Self {
 			is_over: false,
-			board: Board::new(board_container, board),
+			board: Board::new(board_container, board, points_win),
+			cur_turn_side_win,
 			cur_turn_side: WHITE,
 			render_cursor: false,
 			render_available_moves: false
@@ -63,6 +70,7 @@ impl Game {
 		}
 
 		self.board.board_container.render();
+		self.board.render_points();
 	}
 
 	pub fn render_available_moves(&mut self) {
@@ -78,6 +86,21 @@ impl Game {
 		}
 
 		self.board.board_container.render();
+	}
+
+	pub fn render_cur_turn_side(&mut self) {
+		self.cur_turn_side_win.clear();
+		let text_box = Text::default().text(if self.cur_turn_side == WHITE {
+			"White's turn"
+		} else {
+			"Black's turn"
+		});
+		self.cur_turn_side_win.draw_element(&text_box);
+		self.cur_turn_side_win.render();
+	}
+
+	pub fn toggle_side(&mut self) {
+		self.cur_turn_side = if self.cur_turn_side == WHITE { BLACK } else { WHITE };
 	}
 
 	pub fn play_move(&mut self) {
@@ -110,7 +133,7 @@ impl Game {
 	}
 
 	pub fn check_is_over(&mut self) {
-		if !self.board.has_possible_moves(WHITE) || !self.board.has_possible_moves(BLACK) {
+		if !self.board.has_possible_moves(WHITE) && !self.board.has_possible_moves(BLACK) {
 			self.is_over = true;
 		}
 	}

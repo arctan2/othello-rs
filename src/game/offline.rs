@@ -2,7 +2,7 @@ use std::io::Write;
 
 use rand::Rng;
 
-use crate::{termin::{terminal_window::Terminal, window::Window}, sleep};
+use crate::{termin::{terminal_window::Terminal, window::{Window, Position}, elements::Text}, sleep};
 
 use super::{Game, board::{WHITE, BLACK}};
 
@@ -30,6 +30,7 @@ impl Offline {
     let mut cur_turn = self.white;
 
     game.init_board();
+    game.render_cur_turn_side();
 
     while !game.is_over {
       match cur_turn {
@@ -42,7 +43,7 @@ impl Offline {
             sleep(1000);
           }
 
-          game.cur_turn_side = if game.cur_turn_side == WHITE { BLACK } else { WHITE };
+          game.toggle_side();
           cur_turn = if game.cur_turn_side == WHITE { self.white } else { self.black };
         },
         ParticipantType::Bot => {
@@ -63,14 +64,39 @@ impl Offline {
             sleep(1000);
           }
 
-          game.cur_turn_side = if game.cur_turn_side == WHITE { BLACK } else { WHITE };
+          game.toggle_side();
           cur_turn = if game.cur_turn_side == WHITE { self.white } else { self.black };
         }
       }
+      game.render_cur_turn_side();
       game.check_is_over();
       game.render_board();
       terminal.refresh().unwrap();
     }
+
+    game.board.calc_points();
+    let mut game_over_win = offline_win.new_child(Window::default().size(20, 5).position(8, 7));
+    let mut text_box = Text::default().text("Game Over").position(game_over_win.rect(), Position::CenterH);
+
+    text_box.set_xy_rel(0, 1);
+    game_over_win.draw_element(&text_box);
+
+    
+    text_box.set_text(if game.board.black_points > game.board.white_points {
+      "Black won"
+    } else if game.board.white_points > game.board.black_points {
+      "White won"
+    } else {
+      "Draw"
+    });
+    text_box.set_xy_rel(0, 2);
+    game_over_win.draw_element(&text_box);
+
+    game_over_win.render();
+
+    terminal.refresh().unwrap();
+
+    terminal.getch();
 
     offline_win.delete();
   }

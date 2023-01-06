@@ -26,6 +26,7 @@ pub struct Board {
   pub board: [[Side; 8]; 8],
   pub board_container: WindowRef,
   pub board_win: WindowRef,
+  pub points_win: WindowRef,
   pub black_points: u8,
   pub white_points: u8,
   cursor: Cursor,
@@ -44,10 +45,10 @@ const TRAV_ARR: [(i8, i8); 8] = [
 ];
 
 impl Board {
-  pub fn new(board_container: WindowRef, board_win: WindowRef) -> Self {
+  pub fn new(board_container: WindowRef, board_win: WindowRef, points_win: WindowRef) -> Self {
     Self {
       board: [[EMPTY; 8]; 8],
-      board_container, board_win,
+      board_container, board_win, points_win,
       cursor: Cursor { x: 0, y: 0, el: Rectangle::default().bg(Color::Yellow).size(2, 1) },
       white_points: 0, black_points: 0,
       available_moves: HashMap::new()
@@ -83,6 +84,20 @@ impl Board {
     }
 
     self.board_win.render_to_parent();
+  }
+
+  pub fn render_points(&mut self) {
+    let mut text_box = Text::default();
+    self.points_win.clear();
+
+    text_box.set_text(&("white: ".to_string() + &self.white_points.to_string()));
+    self.points_win.draw_element(&text_box);
+    text_box.set_xy_rel(15, 0);
+    text_box.set_text(&("black: ".to_string() + &self.black_points.to_string()));
+    text_box.width_fit();
+    self.points_win.draw_element(&text_box);
+
+    self.points_win.render();
   }
 
   pub fn place_cursor_on_legal_position(&mut self) {
@@ -194,7 +209,7 @@ impl Board {
     for d in TRAV_ARR {
       let (f, _, _) = self.traverse_from(i, j, d.0, d.1, my_side, opponent_side);
       if f {
-        flipped_count = self.flip_from(i, j, d.0, d.1, opponent_side, my_side);
+        flipped_count += self.flip_from(i, j, d.0, d.1, opponent_side, my_side);
       }
       is_flipped = f || is_flipped;
     }
@@ -222,6 +237,22 @@ impl Board {
         self.set_points(self.black_points + flipped_count as u8 + 1, self.white_points - flipped_count as u8);
       } else {
         self.set_points(self.black_points - flipped_count as u8, self.white_points + flipped_count as u8 + 1);
+      }
+      self.render_points();
+    }
+  }
+
+  pub fn calc_points(&mut self) {
+    self.black_points = 0;
+    self.white_points = 0;
+
+    for row in self.board {
+      for square in row {
+        if square == BLACK {
+          self.black_points += 1;
+        } else if square == WHITE {
+          self.white_points += 1;
+        }
       }
     }
   }
