@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crossterm::style::Color;
 
-use crate::termin::{window::WindowRef, elements::{Rectangle, Text}};
+use crate::{termin::{window::WindowRef, elements::{Rectangle, Text}}, sleep};
 
 pub const BLACK: Side = 'b';
 pub const WHITE: Side = 'w';
@@ -126,7 +126,7 @@ impl Board {
 
     if dy == FIX {
       col_idx += dx;
-      if col_idx < 0 { 
+      if col_idx < 0 {
         loop {
           row_idx -= 1;
           if row_idx < 0 {
@@ -290,8 +290,14 @@ impl Board {
           if f {
             match available_moves.get_mut(&r) {
               Some(row) => {
-                if !row.contains(&c) {
-                  row.push(c);
+                for i in (0..row.len()).rev() {
+                  if row[i] == c {
+                    break;
+                  }
+                  if row[i] < c {
+                    row.insert(i + 1, c);
+                    break;
+                  }
                 }
               },
               None => { available_moves.insert(r, vec![c]); }
