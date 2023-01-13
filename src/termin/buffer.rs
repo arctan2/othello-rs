@@ -92,6 +92,11 @@ impl Buffer {
     let a = rect.area() as usize;
     Buffer{ rect, content: vec![Cell::default(); a], bg: Color::Reset }
   }
+  
+  pub fn filled(rect: Rect, fill: Cell) -> Buffer {
+    let a = rect.area() as usize;
+    Buffer { rect, content: vec![fill.clone(); a], bg: fill.bg }
+  }
 
   pub fn content_mut(&mut self) -> &mut Vec<Cell> {
     &mut self.content
@@ -114,11 +119,6 @@ impl Buffer {
 
   pub fn height(&self) -> u16 {
     self.rect.height
-  }
-  
-  pub fn filled(rect: Rect, fill: Cell) -> Buffer {
-    let a = rect.area() as usize;
-    Buffer { rect, content: vec![fill.clone(); a], bg: Color::Reset }
   }
 
   pub fn set_pos(&mut self, x: u16, y: u16) {
@@ -147,9 +147,7 @@ impl Buffer {
   pub fn set_bg(&mut self, bg: Color) {
     self.bg = bg;
     for c in &mut self.content {
-      if c.bg == Color::Reset {
-        c.set_bg(bg);
-      }
+      c.set_bg(bg);
     }
   }
 

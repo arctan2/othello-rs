@@ -54,7 +54,7 @@ impl InputBox {
     execute!(stdout(), cursor::Show).unwrap();
     let mut cursor_pos: usize = 0;
     let mut input_win = win.new_child(
-      Window::default().position(self.x, self.y).size(self.width, self.height)
+      Window::default().xy(self.x, self.y).size(self.width, self.height)
     );
     let mut input_box = Text::default().size(self.width, self.height);
 
@@ -71,10 +71,12 @@ impl InputBox {
           match k.code {
             KeyCode::Esc => {
               execute!(stdout(), cursor::Hide).unwrap();
+              input_win.delete();
               return input_box.get_text().to_string();
             },
             KeyCode::Enter => {
               execute!(stdout(), cursor::Hide).unwrap();
+              input_win.delete();
               return input_box.get_text().to_string();
             },
             KeyCode::Backspace => {

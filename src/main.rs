@@ -47,6 +47,7 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
     handler.draw_window(&root).unwrap();
 
     let new_name = input_win.read_string(&mut input, handler);
+    input_win.delete();
     new_name
   });
 
@@ -57,7 +58,7 @@ fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
 fn offline<W: Write>(terminal: &mut Terminal<W>, _: &mut Ctx, no_of_players: u8) -> Return {
   terminal.clear();
   let mut offline_win = terminal.root.new_child(
-    Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }).position(2, 2)
+    Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }).xy(2, 2)
   );
   let rect = offline_win.rect();
   let mut cur_side = 'w';

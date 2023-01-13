@@ -6,7 +6,7 @@ use crate::sleep;
 
 use super::{
   elements::{Element, InputBox, Text},
-  buffer::{Rect, Buffer}, crossterm_handler::CrosstermHandler
+  buffer::{Rect, Buffer, Cell}, crossterm_handler::CrosstermHandler
 };
 
 pub struct Window {
@@ -79,8 +79,13 @@ impl Window {
     self.buffer.height()
   }
 
-  pub fn position(mut self, x: u16, y: u16) -> Self {
+  pub fn xy(mut self, x: u16, y: u16) -> Self {
     self.set_pos(Position::Coord(x, y));
+    self
+  }
+
+  pub fn position(mut self, pos: Position) -> Self {
+    self.set_pos(pos);
     self
   }
 
@@ -104,7 +109,9 @@ impl Window {
   }
 
   pub fn set_size(&mut self, width: u16, height: u16) {
-    self.buffer = Buffer::empty(Rect::new(self.buffer.left(), self.buffer.top(), width, height));
+    let mut c = Cell::default();
+    c.bg = self.buffer.get_bg();
+    self.buffer = Buffer::filled(Rect::new(self.buffer.left(), self.buffer.top(), width, height), c);
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {

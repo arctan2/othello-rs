@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use crossterm::style::Color;
 use rand::Rng;
 
 use crate::{termin::{terminal_window::Terminal, window::{Window, Position}, elements::Text}, sleep};
@@ -74,25 +75,7 @@ impl Offline {
       terminal.refresh().unwrap();
     }
 
-    game.board.calc_points();
-    let mut game_over_win = offline_win.new_child(Window::default().size(20, 5).position(8, 7));
-    let mut text_box = Text::default().text("Game Over").position(game_over_win.rect(), Position::CenterH);
-
-    text_box.set_xy_rel(0, 1);
-    game_over_win.draw_element(&text_box);
-
-    
-    text_box.set_text(if game.board.black_points > game.board.white_points {
-      "Black won"
-    } else if game.board.white_points > game.board.black_points {
-      "White won"
-    } else {
-      "Draw"
-    });
-    text_box.set_xy_rel(0, 2);
-    game_over_win.draw_element(&text_box);
-
-    game_over_win.render();
+    game.render_game_over(&mut offline_win);
 
     terminal.refresh().unwrap();
 
