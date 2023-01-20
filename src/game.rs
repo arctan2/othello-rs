@@ -1,5 +1,7 @@
 pub mod board;
 pub mod offline;
+pub mod online;
+pub mod macros;
 
 use std::io::Write;
 
@@ -37,7 +39,7 @@ impl Game {
 			is_over: false,
 			board: Board::new(board_container, board, points_win),
 			cur_turn_side_win,
-			cur_turn_side: WHITE,
+			cur_turn_side: BLACK,
 			render_cursor: false,
 			render_available_moves: false
 		}
