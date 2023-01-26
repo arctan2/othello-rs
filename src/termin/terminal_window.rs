@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, Write, Stdout};
 use crossterm::event::{Event, KeyEvent, KeyCode};
 
 use super::{crossterm_handler::CrosstermHandler, window::{Window, WindowRef}};
@@ -7,6 +7,8 @@ pub struct Terminal <W: Write> {
   pub handler: CrosstermHandler<W>,
   pub root: WindowRef
 }
+
+pub type TerminalHandler = Terminal<Stdout>;
 
 impl <W: Write> Terminal<W> {
   pub fn new(root: Window, handler: CrosstermHandler<W>) -> Terminal<W> {

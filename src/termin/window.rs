@@ -379,6 +379,15 @@ impl WindowRef {
     self.inner().abs_pos()
   }
 
+  pub fn size(mut self, width: u16, height: u16) -> Self {
+    self.inner_mut().set_size(width, height);
+    self
+  }
+
+  pub fn set_size(&mut self, width: u16, height: u16) {
+    self.inner_mut().set_size(width, height);
+  }
+
   pub fn set_bg(&mut self, bg: Color) {
     self.inner_mut().set_bg(bg);
   }
@@ -409,6 +418,10 @@ impl WindowRef {
 
   pub fn render_to_parent(&mut self) {
     self.inner_mut().render_to_parent();
+  }
+
+  pub fn is_root(&self) -> bool {
+    self.inner().is_root()
   }
 
   pub fn render(&mut self) {

@@ -60,7 +60,7 @@ macro_rules! impl_setters {
 
       pub fn set_position(&mut self, rect: Rect, pos: Position) {
         match pos {
-          Position::Coord(x, y) => self.set_xy(x, y),
+          Position::Coord(x, y) => self.set_xy(rect.x + x, rect.y + y),
           Position::CenterB | Position::CenterV | Position::CenterH => {
             let (x, y) = rect.get_center_start_pos(self.rect.clone());
 

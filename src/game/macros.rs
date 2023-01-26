@@ -1,5 +1,13 @@
 macro_rules! choose_side_win {
   ($terminal:ident, $heading:expr, $label:expr) => {{
+    use crossterm::{style::{Color, Attribute}, event::KeyCode};
+    use crate::{
+      termin::{
+        window::{Window, draw_elements, Position::*},
+        elements::Text
+      },
+      menu::Return
+    };
     $terminal.clear();
     let mut win = $terminal.root.new_child(
       Window::default().size(30, 10).bg(Color::Rgb { r: 0, g: 180, b: 0 }).xy(2, 2)

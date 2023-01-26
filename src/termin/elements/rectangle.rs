@@ -29,6 +29,10 @@ impl Rectangle {
   pub fn set_bg(&mut self, bg: Color) {
     self.bg = bg;
   }
+
+  pub fn rect(&self) -> Rect {
+    self.rect
+  }
 }
 
 impl_setters!(Rectangle);

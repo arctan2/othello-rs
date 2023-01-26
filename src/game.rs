@@ -2,6 +2,7 @@ pub mod board;
 pub mod offline;
 pub mod online;
 pub mod macros;
+pub mod socket;
 
 use std::io::Write;
 

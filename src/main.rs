@@ -1,21 +1,24 @@
 mod termin;
 mod game;
 mod menu;
+mod custom_elements;
 
-use std::{time::Duration, io::Write};
+use std::time::Duration;
 use std::thread;
-use std::io::{stdout};
+use std::io::stdout;
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  execute, cursor
+  execute, cursor, style::Color
 };
-use game::online::{join_online_game, create_game};
+use custom_elements::DialogBox;
+use game::macros::choose_side_win;
+use game::online::Online;
 use menu::{Menu, Return};
-use serde::Deserialize;
 use termin::elements::Text;
+use termin::terminal_window::TerminalHandler;
 use termin::window::{Window, Position::*};
 use termin::{
-  crossterm_handler::CrosstermHandler, terminal_window::Terminal,
+  crossterm_handler::CrosstermHandler
 };
 
 use crate::game::offline::play_offline;
@@ -25,7 +28,7 @@ fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
 
-fn change_name<W: Write>(terminal: &mut Terminal<W>, ctx: &mut Ctx) -> Return {
+fn change_name(terminal: &mut TerminalHandler, ctx: &mut Ctx) -> Return {
   terminal.root.clear();
   terminal.refresh().unwrap();
 
@@ -89,10 +92,14 @@ fn main() {
             .sub_menu("online", 
               Menu::<Ctx>::new("Online")
               .action("create game", &|terminal, ctx| -> Return {
-                create_game(terminal, &ctx.name)
+                let host_side = choose_side_win!(terminal, "Create Game Online", "Choose your side:");
+                Online::default()
+                  .player_name(&ctx.name)
+                  .side(host_side)
+                  .create_and_start(terminal);
+                Return::None
               })
               .action("join game", &|terminal, ctx| -> Return {
-                join_online_game();
                 Return::All
               })
               .back("back")
