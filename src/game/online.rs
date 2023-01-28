@@ -10,10 +10,11 @@ use crate::{sleep, termin::{
   terminal_window::{Terminal, TerminalHandler}
 }, custom_elements::DialogBox};
 
-use super::socket::SocketMsg;
+use super::{socket::SocketMsg, board::{WHITE, Side}};
 
 pub struct Online {
-  pub player_name: String,
+  player_name: String,
+  lobby: Lobby,
   pub side: char,
   pub player_id: String,
   pub game_id: String,
@@ -21,11 +22,48 @@ pub struct Online {
 
 impl Default for Online {
   fn default() -> Self {
-    Online { player_name: "".to_string(), side: '\0' , player_id: "".to_string(), game_id: "".to_string() }
+    Online { 
+      lobby: Lobby::new(),
+      side: '\0', 
+      player_id: "".to_string(),
+      game_id: "".to_string(),
+      player_name: "".to_string()
+    }
   }
 }
 
 type WS = WebSocket<MaybeTlsStream<TcpStream>>;
+
+macro_rules! emit {
+  ($socket:expr,$e:expr) => {
+    $socket.write_message(Message::Text($e))
+  };
+  ($socket:expr,$e:expr,$data:expr) => {
+    match $socket.write_message(Message::Text($e.to_string())) {
+      Ok(_) => {
+        $socket.write_message($data)
+      },
+      Err(e) => Err(e)
+    }
+  };
+}
+
+macro_rules! emit_json {
+  ($socket:expr,$e:expr,$data:expr) => {
+    match $socket.write_message(Message::Text($e.to_string())) {
+      Ok(_) => {
+        match serde_json::to_string(&$data) {
+          Ok(j) => match $socket.write_message(Message::Text(j)) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string())
+          },
+          Err(e) => Err(e.to_string())
+        }
+      },
+      Err(e) => Err(e.to_string())
+    }
+  };
+}
 
 struct Lobby {
   white_name: Option<String>,
@@ -36,19 +74,25 @@ impl Lobby {
   fn new() -> Self {
     Self{ white_name: None, black_name: None }
   }
+}
 
-  fn join(&mut self) {
-  }
+#[derive(Serialize)]
+struct PlayerInfo {
+  playerName: String,
+  side: char,
+  isReconnect: bool,
+  playerId: String
 }
 
 impl Online {
-  pub fn player_name(mut self, player_name: &str) -> Self {
-    self.player_name = player_name.to_string(); 
-    self
-  }
-
-  pub fn side(mut self, side: char) -> Self {
+  pub fn set_player(mut self, side: Side, player_name: &str) -> Self {
     self.side = side;
+    self.player_name = player_name.to_string();
+    if self.side == WHITE {
+      self.lobby.white_name = Some(player_name.to_string());
+    } else { 
+      self.lobby.black_name = Some(player_name.to_string()); 
+    }
     self
   }
 
@@ -104,20 +148,64 @@ impl Online {
     }
   }
 
-  fn join_lobby(&mut self, mut socket: WS, terminal: &mut TerminalHandler) {
-    let mut game_verified = false;
+  fn handle_join_lobby_socket(&mut self, socket: &mut WS, msg: SocketMsg, terminal: &mut TerminalHandler) -> bool {
+    let mut dbox = DialogBox::new(35, 5)
+                  .position(terminal.root.rect(), Position::Coord(5, 5))
+                  .text("");
 
-    match socket.read_message().unwrap() {
-      Message::Text(t) => {
-        let msg = SocketMsg::from(t);
-        match msg.event_name() {
-          "game-verified" => {
-            game_verified = msg.parse();
-          },
-          _ => ()
+    match msg.event_name() {
+      "game-verified" => {
+        if !msg.parse::<bool>() {
+          dbox.error("game not found :(");
+          terminal.root.draw_element(&dbox);
+        } else {
+          let player_info = PlayerInfo{
+            playerName: self.player_name.clone(), side: self.side, isReconnect: false, playerId: "".to_string()
+          };
+          match emit_json!(socket, "join-player-info", player_info) {
+            Ok(_) => (),
+            Err(e) => {
+              dbox.error(e.as_str());
+              terminal.root.draw_element(&dbox);
+            }
+          }
+        }
+      },
+      "join-player-info-res" => {
+        #[derive(Deserialize)]
+        struct JoinPlayerInfoRes {
+          err: bool,
+          msg: String,
+          playerId: Option<String>,
+          side: Option<Side> 
+        }
+        let msg: JoinPlayerInfoRes = msg.parse();
+        if msg.err {
+          dbox.error(&msg.msg);
+          terminal.root.draw_element(&dbox);
+        } else {
+          self.player_id = msg.playerId.unwrap();
+          self.side = msg.side.unwrap();
         }
       },
       _ => ()
+    }
+    false
+  }
+
+  fn join_lobby(&mut self, mut socket: WS, terminal: &mut TerminalHandler) {
+    terminal.clear();
+
+    loop {
+      match socket.read_message().unwrap() {
+        Message::Text(t) => {
+          let msg = SocketMsg::from(t);
+          if self.handle_join_lobby_socket(&mut socket, msg, terminal) {
+            break
+          }
+        },
+        _ => ()
+      }
     }
   }
 
@@ -129,19 +217,19 @@ impl Online {
     dbox.info("creating game...");
 
     terminal.root.clear();
-    dbox.render(&mut terminal.root);
+    terminal.root.draw_element(&dbox);
     terminal.refresh().unwrap();
 
     match self.create_game() {
       Ok(()) => {
         dbox.info("connecting game...");
-        dbox.render(&mut terminal.root);
+        terminal.root.draw_element(&dbox);
         terminal.refresh().unwrap();
 
         match self.connect_socket() {
           Err(e) => {
             dbox.error(e.as_str());
-            dbox.render(&mut terminal.root);
+            terminal.root.draw_element(&dbox);
             terminal.refresh().unwrap();
             terminal.getch();
           },
@@ -152,7 +240,7 @@ impl Online {
       },
       Err(_) => { 
         dbox.error("couldn't connect to server :(");
-        dbox.render(&mut terminal.root);
+        terminal.root.draw_element(&dbox);
         terminal.refresh().unwrap();
         terminal.getch();
       }

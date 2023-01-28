@@ -94,8 +94,7 @@ fn main() {
               .action("create game", &|terminal, ctx| -> Return {
                 let host_side = choose_side_win!(terminal, "Create Game Online", "Choose your side:");
                 Online::default()
-                  .player_name(&ctx.name)
-                  .side(host_side)
+                  .set_player(host_side, &ctx.name)
                   .create_and_start(terminal);
                 Return::None
               })

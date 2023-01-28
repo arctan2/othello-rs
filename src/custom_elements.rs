@@ -1,25 +1,16 @@
 use crossterm::style::Color;
 
-use crate::termin::{window::{WindowRef, Position}, elements::{Text, Rectangle}, buffer::Rect};
+use crate::termin::{window::Position, elements::{Text, Rectangle, Element}, buffer::Rect};
 
 pub struct DialogBox {
-  pub text_box: Text,
-  pub rect: Rectangle
+  text_box: Text,
+  rect: Rectangle
 }
 
 impl DialogBox {
   pub fn new(width: u16, height: u16) -> Self {
     Self { text_box: Text::default().size(width - 2, height - 2).xy(1, 1), rect: Rectangle::default().size(width, height) }
   }
-
-  pub fn render(&mut self, win: &mut WindowRef) {
-    win.clear();
-    win.draw_element(&self.rect);
-    win.draw_element(&self.text_box);
-    if !win.is_root() {
-      win.render();
-    } 
-  } 
 
   pub fn set_text(&mut self, text: &str) {
     self.text_box.set_text(text);
@@ -71,5 +62,12 @@ impl DialogBox {
   pub fn info(&mut self, info: &str) {
     self.rect.set_bg(Color::Blue);
     self.set_text(info);
+  }
+}
+
+impl Element for DialogBox {
+  fn draw(&self, buf: &mut crate::termin::buffer::Buffer) {
+    self.rect.draw(buf);
+    self.text_box.draw(buf);
   }
 }
