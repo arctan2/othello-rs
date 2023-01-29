@@ -93,7 +93,7 @@ fn main() {
               Menu::<Ctx>::new("Online")
               .action("create game", &|terminal, ctx| -> Return {
                 let host_side = choose_side_win!(terminal, "Create Game Online", "Choose your side:");
-                Online::default()
+                Online::new(&mut terminal.root)
                   .set_player(host_side, &ctx.name)
                   .create_and_start(terminal);
                 Return::None

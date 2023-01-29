@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
 
 use crate::{sleep, termin::{
-  window::{Window, Position},
-  terminal_window::{Terminal, TerminalHandler}
+  window::{Window, Position, WindowRef},
+  terminal_window::{Terminal, TerminalHandler}, elements::{Rectangle, Text}
 }, custom_elements::DialogBox};
 
-use super::{socket::SocketMsg, board::{WHITE, Side}};
+use super::{socket::{WS, SocketMsg, emit_json}, board::{WHITE, Side}};
 
 pub struct Online {
   player_name: String,
@@ -20,10 +20,10 @@ pub struct Online {
   pub game_id: String,
 }
 
-impl Default for Online {
-  fn default() -> Self {
+impl Online {
+  pub fn new(win: &mut WindowRef) -> Self {
     Online { 
-      lobby: Lobby::new(),
+      lobby: Lobby::new(win),
       side: '\0', 
       player_id: "".to_string(),
       game_id: "".to_string(),
@@ -32,54 +32,82 @@ impl Default for Online {
   }
 }
 
-type WS = WebSocket<MaybeTlsStream<TcpStream>>;
-
-macro_rules! emit {
-  ($socket:expr,$e:expr) => {
-    $socket.write_message(Message::Text($e))
-  };
-  ($socket:expr,$e:expr,$data:expr) => {
-    match $socket.write_message(Message::Text($e.to_string())) {
-      Ok(_) => {
-        $socket.write_message($data)
-      },
-      Err(e) => Err(e)
-    }
-  };
-}
-
-macro_rules! emit_json {
-  ($socket:expr,$e:expr,$data:expr) => {
-    match $socket.write_message(Message::Text($e.to_string())) {
-      Ok(_) => {
-        match serde_json::to_string(&$data) {
-          Ok(j) => match $socket.write_message(Message::Text(j)) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e.to_string())
-          },
-          Err(e) => Err(e.to_string())
-        }
-      },
-      Err(e) => Err(e.to_string())
-    }
-  };
-}
 
 struct Lobby {
   white_name: Option<String>,
-  black_name: Option<String>
+  black_name: Option<String>,
+  lobby_win: WindowRef
+}
+
+macro_rules! render_seq {
+  ($win:expr,{x: $x:expr,y: $y:expr},$first:expr,$first_gap:expr,$($el:expr,$gap:expr),+) => {
+    $first.set_xy($x, $y);
+    let (mut prev_left, mut prev_bottom) = ($x, $first.height() + $y + $first_gap);
+    $win.render_element(&$first);
+    $(
+      $el.set_xy(prev_left, prev_bottom);
+      $win.draw_element(&$el);
+      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
+    )+
+  };
+  ($win:expr,{x: $x:expr,y: $y:expr, gap: $gap:expr},$first:expr,$($el:expr),+) => {
+    $first.set_xy($x, $y);
+    let (mut prev_left, mut prev_bottom) = ($first.x(), $first.height() + $first.y() + $gap);
+    $win.render_element(&$first);
+    $(
+      $el.set_xy(prev_left, prev_bottom);
+      $win.draw_element(&$el);
+      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
+    )+
+  };
 }
 
 impl Lobby {
-  fn new() -> Self {
-    Self{ white_name: None, black_name: None }
+  fn new(win: &mut WindowRef) -> Self {
+    Self{
+      white_name: None,
+      black_name: None,
+      lobby_win: win.new_child(Window::default().size(50, 15))
+    }
+  }
+
+  fn render(&mut self, terminal: &mut TerminalHandler) {
+    terminal.clear();
+    let mut wrect = Rectangle::default().bg(Color::White).size(6, 3);
+    let mut brect = Rectangle::default().bg(Color::Black).size(6, 3);
+    let mut text = Text::default().text("Lobby").position(self.lobby_win.rect(), Position::CenterH).xy_rel(0, 1);
+    self.lobby_win.set_bg(Color::Green);
+
+    self.lobby_win.draw_element(&text);
+
+    render_seq!(self.lobby_win, {x: 1, y: 3, gap: 1}, brect, wrect);
+
+    text.set_xy(9, 4);
+    text.set_text(match self.black_name.as_ref() {
+      Some(name) => name,
+      None => "waiting to connect...."
+    });
+    text.width_fit();
+    self.lobby_win.draw_element(&text);
+
+    text.set_xy(9, 8);
+    text.set_text(match self.white_name.as_ref() {
+      Some(name) => name,
+      None => "waiting to connect...."
+    });
+    text.width_fit();
+    self.lobby_win.draw_element(&text);
+
+    terminal.handler.draw_window(&self.lobby_win).unwrap();
+    terminal.flush().unwrap();
+    sleep(5000);
   }
 }
 
 #[derive(Serialize)]
 struct PlayerInfo {
   playerName: String,
-  side: char,
+  side: u8,
   isReconnect: bool,
   playerId: String
 }
@@ -160,13 +188,19 @@ impl Online {
           terminal.root.draw_element(&dbox);
         } else {
           let player_info = PlayerInfo{
-            playerName: self.player_name.clone(), side: self.side, isReconnect: false, playerId: "".to_string()
+            playerName: self.player_name.clone(), side: self.side as u8, isReconnect: false, playerId: "".to_string()
           };
+
           match emit_json!(socket, "join-player-info", player_info) {
-            Ok(_) => (),
+            Ok(_) => {
+              dbox.info("joining lobby...");
+              terminal.root.draw_element(&dbox);
+              terminal.refresh().unwrap();
+            },
             Err(e) => {
               dbox.error(e.as_str());
               terminal.root.draw_element(&dbox);
+              terminal.refresh().unwrap();
             }
           }
         }
@@ -177,7 +211,7 @@ impl Online {
           err: bool,
           msg: String,
           playerId: Option<String>,
-          side: Option<Side> 
+          side: Option<u8> 
         }
         let msg: JoinPlayerInfoRes = msg.parse();
         if msg.err {
@@ -185,7 +219,9 @@ impl Online {
           terminal.root.draw_element(&dbox);
         } else {
           self.player_id = msg.playerId.unwrap();
-          self.side = msg.side.unwrap();
+          self.side = msg.side.unwrap() as char;
+
+          self.lobby.render(terminal);
         }
       },
       _ => ()

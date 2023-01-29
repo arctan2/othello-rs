@@ -79,7 +79,7 @@ macro_rules! impl_setters {
       }
 
       pub fn height(&self) -> u16 {
-        self.rect.width
+        self.rect.height
       }
 
       pub fn x(&self) -> u16 {
