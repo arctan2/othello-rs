@@ -3,7 +3,7 @@ use crate::termin::buffer::Cell;
 use crossterm::{
   queue,
   style::{Print, SetAttribute, SetBackgroundColor, SetForegroundColor, Color, Attribute},
-  cursor::MoveTo, event::{read, Event}
+  cursor::MoveTo, event::{read, Event, KeyCode}
 };
 
 use super::window::WindowRef;
@@ -79,6 +79,15 @@ where W: Write {
   pub fn event(&self) -> Event {
     read().unwrap()
   } 
+
+  pub fn getch(&self) -> KeyCode {
+    loop {
+      match self.event() {
+        Event::Key(k) => return k.code,
+        _ => ()
+      }
+    }
+  }
 
   pub fn flush(&mut self) -> io::Result<()> {
     self.buffer.flush()

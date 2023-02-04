@@ -1,6 +1,7 @@
-use std::{net::TcpStream, io::Write};
+use std::{net::TcpStream, io::Write, sync::mpsc::{self, Sender, Receiver}, thread};
 
-use crossterm::style::Color;
+use copypasta::{ClipboardContext, ClipboardProvider};
+use crossterm::{style::Color, event::{KeyCode, Event}};
 use reqwest::{Url, StatusCode};
 use serde::{Deserialize, Serialize};
 use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
@@ -34,8 +35,8 @@ impl Online {
 
 
 struct Lobby {
-  white_name: Option<String>,
-  black_name: Option<String>,
+  white_name: String,
+  black_name: String,
   lobby_win: WindowRef
 }
 
@@ -65,42 +66,37 @@ macro_rules! render_seq {
 impl Lobby {
   fn new(win: &mut WindowRef) -> Self {
     Self{
-      white_name: None,
-      black_name: None,
+      white_name: "".to_string(),
+      black_name: "".to_string(),
       lobby_win: win.new_child(Window::default().size(50, 15))
     }
   }
 
   fn render(&mut self, terminal: &mut TerminalHandler) {
-    terminal.clear();
+    self.lobby_win.clear();
     let mut wrect = Rectangle::default().bg(Color::White).size(6, 3);
     let mut brect = Rectangle::default().bg(Color::Black).size(6, 3);
-    let mut text = Text::default().text("Lobby").position(self.lobby_win.rect(), Position::CenterH).xy_rel(0, 1);
+    let text = Text::default().text("Lobby").position(self.lobby_win.rect(), Position::CenterH).xy_rel(0, 1);
     self.lobby_win.set_bg(Color::Green);
 
     self.lobby_win.draw_element(&text);
 
     render_seq!(self.lobby_win, {x: 1, y: 3, gap: 1}, brect, wrect);
 
-    text.set_xy(9, 4);
-    text.set_text(match self.black_name.as_ref() {
-      Some(name) => name,
-      None => "waiting to connect...."
-    });
-    text.width_fit();
-    self.lobby_win.draw_element(&text);
-
-    text.set_xy(9, 8);
-    text.set_text(match self.white_name.as_ref() {
-      Some(name) => name,
-      None => "waiting to connect...."
-    });
-    text.width_fit();
-    self.lobby_win.draw_element(&text);
+    self.lobby_win.draw_text(if self.black_name != "" {
+      self.black_name.as_str()
+    } else {
+      "waiting to connect...."
+    }, Position::Coord(9, 4));
+    self.lobby_win.draw_text(if self.white_name != "" {
+      self.white_name.as_str()
+    } else {
+      "waiting to connect...."
+    }, Position::Coord(9, 8));
+    self.lobby_win.draw_text("copied game link to clipboard", Position::Coord(9, 11));
 
     terminal.handler.draw_window(&self.lobby_win).unwrap();
     terminal.flush().unwrap();
-    sleep(5000);
   }
 }
 
@@ -116,11 +112,6 @@ impl Online {
   pub fn set_player(mut self, side: Side, player_name: &str) -> Self {
     self.side = side;
     self.player_name = player_name.to_string();
-    if self.side == WHITE {
-      self.lobby.white_name = Some(player_name.to_string());
-    } else { 
-      self.lobby.black_name = Some(player_name.to_string()); 
-    }
     self
   }
 
@@ -176,6 +167,11 @@ impl Online {
     }
   }
 
+  fn copy_link_to_clipboard(&self) {
+    let url_str = "http://localhost:5000/api/join-game/".to_string() + &self.game_id;
+    ClipboardContext::new().unwrap().set_contents(String::from(url_str).to_owned()).unwrap();
+  }
+
   fn handle_join_lobby_socket(&mut self, socket: &mut WS, msg: SocketMsg, terminal: &mut TerminalHandler) -> bool {
     let mut dbox = DialogBox::new(35, 5)
                   .position(terminal.root.rect(), Position::Coord(5, 5))
@@ -218,11 +214,23 @@ impl Online {
           dbox.error(&msg.msg);
           terminal.root.draw_element(&dbox);
         } else {
-          self.player_id = msg.playerId.unwrap();
-          self.side = msg.side.unwrap() as char;
 
           self.lobby.render(terminal);
+          self.copy_link_to_clipboard();
         }
+      },
+      "lobby-info" => {
+        #[derive(Deserialize)]
+        struct LobbyInfo {
+          black: String,
+          white: String
+        }
+        let info: LobbyInfo = msg.parse();
+        self.lobby.black_name = info.black;
+        self.lobby.white_name = info.white;
+        self.lobby.render(terminal);
+      },
+      "countdown-begin" => {
       },
       _ => ()
     }
@@ -255,6 +263,7 @@ impl Online {
     terminal.root.clear();
     terminal.root.draw_element(&dbox);
     terminal.refresh().unwrap();
+    terminal.root.clear();
 
     match self.create_game() {
       Ok(()) => {
@@ -274,8 +283,8 @@ impl Online {
           }
         }
       },
-      Err(_) => { 
-        dbox.error("couldn't connect to server :(");
+      Err(e) => { 
+        dbox.error(e.as_str());
         terminal.root.draw_element(&dbox);
         terminal.refresh().unwrap();
         terminal.getch();

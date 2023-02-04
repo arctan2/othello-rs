@@ -24,12 +24,7 @@ impl <W: Write> Terminal<W> {
   }
 
   pub fn getch(&self) -> KeyCode {
-    loop {
-      match self.event() {
-        Event::Key(k) => return k.code,
-        _ => ()
-      }
-    }
+    self.handler.getch()
   }
 
   pub fn refresh(&mut self) -> io::Result<()> {
