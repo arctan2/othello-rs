@@ -1,6 +1,7 @@
 use std::io::{Write, stdout};
 
-use crossterm::{style::{Color, Attribute}, event::{KeyCode, Event}, execute, cursor, queue};
+use copypasta::ClipboardProvider;
+use crossterm::{style::{Color, Attribute}, event::{KeyCode, Event, KeyEvent, KeyModifiers}, execute, cursor, queue};
 
 use crate::termin::{buffer::{Rect, Buffer, Cell}, window::{WindowRef, Window, Position}, crossterm_handler::CrosstermHandler};
 
@@ -67,6 +68,27 @@ impl InputBox {
 
     loop {
       match handler.event() {
+        Event::Paste(s) => {
+          let len = s.len();
+          input_box.push_string(s);
+          if cursor_pos + len > self.max_len as usize{
+            input_box.chop_after(self.max_len as usize);
+            cursor_pos = self.max_len as usize;
+          } else {
+            cursor_pos += len as usize;
+          }
+        },
+        Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL, kind: _, state: _}) => {
+          let s = copypasta::ClipboardContext::new().unwrap().get_contents().unwrap();
+          let len = s.len();
+          input_box.push_string(s);
+          if cursor_pos + len as usize > self.max_len as usize{
+            input_box.chop_after(self.max_len as usize);
+            cursor_pos = self.max_len as usize;
+          } else {
+            cursor_pos += len as usize;
+          }
+        }
         Event::Key(k) => {
           match k.code {
             KeyCode::Esc => {

@@ -39,7 +39,6 @@ fn change_name(terminal: &mut TerminalHandler, ctx: &mut Ctx) -> Return {
                     .max_len(20)
                     .position(label.x() + label.width(), label.y())
                     .size(21, 1).start_text((0, 0));
-    
 
     input_win.set_xy_rel(2, 2);
     input_win.draw_element(&label);
@@ -99,7 +98,10 @@ fn main() {
                 Return::None
               })
               .action("join game", &|terminal, ctx| -> Return {
-                Return::All
+                Online::new(&mut terminal.root)
+                  .set_player('\0', &ctx.name)
+                  .join_and_start(terminal);
+                Return::None
               })
               .back("back")
             )

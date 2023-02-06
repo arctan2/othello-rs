@@ -69,6 +69,10 @@ impl Text {
     self.text.push_str(&s);
   }
 
+  pub fn chop_after(&mut self, idx: usize) {
+    self.text.split_off(idx);
+  }
+
   pub fn add_char_at(&mut self, idx: usize, ch: char) {
     self.text.insert(idx, ch)
   }

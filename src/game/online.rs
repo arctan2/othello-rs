@@ -8,7 +8,7 @@ use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
 
 use crate::{sleep, termin::{
   window::{Window, Position, WindowRef},
-  terminal_window::{Terminal, TerminalHandler}, elements::{Rectangle, Text}
+  terminal_window::{Terminal, TerminalHandler}, elements::{Rectangle, Text, InputBox}
 }, custom_elements::DialogBox};
 
 use super::{socket::{WS, SocketMsg, emit_json}, board::{WHITE, Side}};
@@ -254,6 +254,28 @@ impl Online {
   }
 
   pub fn join_and_start(&mut self, terminal: &mut TerminalHandler) {
+    terminal.root.clear();
+    let game_link = terminal.handle_input(|handler, root| -> String {
+      let mut input_win = root.new_child(Window::default().size(50, 10));
+      let label = Text::default().text("game link: ").xy(0, 2);
+      let mut input = InputBox::default()
+                      .max_len(50)
+                      .position(label.x() + label.width(), label.y())
+                      .size(25, 3).start_text((0, 0));
+
+      input_win.set_xy_rel(2, 2);
+      input_win.draw_element(&label);
+      input_win.draw_text("Join Game", Position::CenterH);
+      input_win.render();
+
+      handler.draw_window(&root).unwrap();
+
+      let new_name = input_win.read_string(&mut input, handler);
+      input_win.delete();
+      new_name
+    });
+    println!("{}", game_link);
+    sleep(1000);
   }
 
   pub fn create_and_start(&mut self, terminal: &mut TerminalHandler) {
