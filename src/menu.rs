@@ -113,7 +113,7 @@ impl <'a, T> Menu <'a, T> {
         opt.set_position(options_win.rect(), CenterH);
 
         if idx == self.cursor as usize {
-          let bg = Rectangle::from_rect(opt.get_rect()).bg(Color::Green);
+          let bg = Rectangle::from_rect(opt.rect()).bg(Color::Green);
           options_win.draw_element(&bg); 
           opt.set_fg(Color::Black);
         }

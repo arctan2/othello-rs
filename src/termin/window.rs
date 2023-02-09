@@ -120,12 +120,13 @@ impl Window {
 
   pub fn draw_text(&mut self, text: &str, pos: Position) {
     let mut t = Text::default().text(text);
-    t.set_position(self.buffer.rect(), pos);
+    let r = Rect::new(0, 0, self.width(), self.height());
+    t.set_position(r, pos);
     self.draw_element(&t);
   }
 
   pub fn buffer(&self) -> &Buffer {
-    &self.buffer   
+    &self.buffer
   }
 
   pub fn buffer_mut(&mut self) -> &mut Buffer {

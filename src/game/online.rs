@@ -1,15 +1,13 @@
-use std::{net::TcpStream, io::Write, sync::mpsc::{self, Sender, Receiver}, thread};
-
 use copypasta::{ClipboardContext, ClipboardProvider};
-use crossterm::{style::Color, event::{KeyCode, Event}};
+use crossterm::style::Color;
 use reqwest::{Url, StatusCode};
 use serde::{Deserialize, Serialize};
-use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
+use tungstenite::Message;
 
 use crate::{sleep, termin::{
   window::{Window, Position, WindowRef},
-  terminal_window::{Terminal, TerminalHandler}, elements::{Rectangle, Text, InputBox}
-}, custom_elements::DialogBox};
+  terminal_window::TerminalHandler, elements::{Rectangle, Text, InputBox}
+}, custom_elements::DialogBox, game::macros::render_seq};
 
 use super::{socket::{WS, SocketMsg, emit_json}, board::{WHITE, Side}};
 
@@ -33,42 +31,23 @@ impl Online {
   }
 }
 
-
 struct Lobby {
+  name: String,
   white_name: String,
   black_name: String,
-  lobby_win: WindowRef
-}
-
-macro_rules! render_seq {
-  ($win:expr,{x: $x:expr,y: $y:expr},$first:expr,$first_gap:expr,$($el:expr,$gap:expr),+) => {
-    $first.set_xy($x, $y);
-    let (mut prev_left, mut prev_bottom) = ($x, $first.height() + $y + $first_gap);
-    $win.render_element(&$first);
-    $(
-      $el.set_xy(prev_left, prev_bottom);
-      $win.draw_element(&$el);
-      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
-    )+
-  };
-  ($win:expr,{x: $x:expr,y: $y:expr, gap: $gap:expr},$first:expr,$($el:expr),+) => {
-    $first.set_xy($x, $y);
-    let (mut prev_left, mut prev_bottom) = ($first.x(), $first.height() + $first.y() + $gap);
-    $win.render_element(&$first);
-    $(
-      $el.set_xy(prev_left, prev_bottom);
-      $win.draw_element(&$el);
-      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
-    )+
-  };
+  lobby_win: WindowRef,
+  game_status_win: WindowRef
 }
 
 impl Lobby {
   fn new(win: &mut WindowRef) -> Self {
-    Self{
+    let mut lobby_win = win.new_child(Window::default().size(50, 15));
+    Self {
+      name: "".to_string(),
       white_name: "".to_string(),
       black_name: "".to_string(),
-      lobby_win: win.new_child(Window::default().size(50, 15))
+      game_status_win: lobby_win.new_child(Window::default().bg(Color::Green).size(40, 1).xy(9, 11)),
+      lobby_win,
     }
   }
 
@@ -93,9 +72,10 @@ impl Lobby {
     } else {
       "waiting to connect...."
     }, Position::Coord(9, 8));
-    self.lobby_win.draw_text("copied game link to clipboard", Position::Coord(9, 11));
+    self.game_status_win.draw_text("copied game link to clipboard", Position::Coord(0, 0));
+    self.game_status_win.render_to_parent();
 
-    terminal.handler.draw_window(&self.lobby_win).unwrap();
+    terminal.draw_window(&self.lobby_win).unwrap();
     terminal.flush().unwrap();
   }
 }
@@ -214,7 +194,6 @@ impl Online {
           dbox.error(&msg.msg);
           terminal.root.draw_element(&dbox);
         } else {
-
           self.lobby.render(terminal);
           self.copy_link_to_clipboard();
         }
@@ -231,6 +210,18 @@ impl Online {
         self.lobby.render(terminal);
       },
       "countdown-begin" => {
+        self.lobby.game_status_win.clear();
+
+        for i in (0..=2).rev() {
+          let t = "Game will start in ".to_string() + &i.to_string();
+          self.lobby.game_status_win.draw_text(&t, Position::Coord(0, 0));
+          terminal.draw_window(&self.lobby.game_status_win).unwrap();
+          terminal.flush().unwrap();
+          sleep(1000);
+        }
+
+        terminal.getch();
+        return true;
       },
       _ => ()
     }
@@ -253,13 +244,31 @@ impl Online {
     }
   }
 
+  pub fn connect_game(&mut self, mut dbox: DialogBox, terminal: &mut TerminalHandler) {
+    dbox.info("connecting game...");
+    terminal.root.draw_element(&dbox);
+    terminal.refresh().unwrap();
+
+    match self.connect_socket() {
+      Err(e) => {
+        dbox.error(e.as_str());
+        terminal.root.draw_element(&dbox);
+        terminal.refresh().unwrap();
+        terminal.getch();
+      },
+      Ok(socket) => {
+        self.join_lobby(socket, terminal);
+      }
+    }
+  }
+
   pub fn join_and_start(&mut self, terminal: &mut TerminalHandler) {
     terminal.root.clear();
     let game_link = terminal.handle_input(|handler, root| -> String {
       let mut input_win = root.new_child(Window::default().size(50, 10));
       let label = Text::default().text("game link: ").xy(0, 2);
       let mut input = InputBox::default()
-                      .max_len(50)
+                      .max_len(60)
                       .position(label.x() + label.width(), label.y())
                       .size(25, 3).start_text((0, 0));
 
@@ -274,8 +283,84 @@ impl Online {
       input_win.delete();
       new_name
     });
-    println!("{}", game_link);
-    sleep(1000);
+
+    let mut dbox = DialogBox::new(35, 5).position(terminal.root.rect(), Position::Coord(5, 5));
+    dbox.info("checking game existence...");
+    terminal.root.clear();
+    terminal.root.draw_element(&dbox);
+    terminal.refresh().unwrap();
+    terminal.root.clear();
+
+    self.extract_game_id(game_link);
+
+    match self.is_game_exist() {
+      Ok(is_exist) => {
+        if is_exist {
+          self.connect_game(dbox, terminal);
+        } else {
+          dbox.error("game doesn't exist!");
+          terminal.root.draw_element(&dbox);
+          terminal.refresh().unwrap();
+          terminal.getch();
+        }
+      },
+      Err(e) => {
+        dbox.error(e.as_str());
+        terminal.root.draw_element(&dbox);
+        terminal.refresh().unwrap();
+        terminal.getch();
+      }
+    }
+  }
+
+  fn extract_game_id(&mut self, link: String) {
+    match link.trim_end_matches("/").split("/").collect::<Vec<&str>>().last() {
+      Some(last) => {
+        self.game_id = last.to_string();
+      },
+      None => ()
+    }
+  }
+
+  fn is_game_exist(&mut self) -> Result<bool, String> {
+    if self.game_id.is_empty() {
+      return Err("invalid link.".to_string());
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Response {
+      lobbyName: Option<String>,
+      isLobbyFull: Option<bool>,
+      err: bool,
+      msg: String
+    }
+
+    let req = reqwest::blocking::Client::new();
+    let link = "http://localhost:5000/api/game-info/".to_string() + &self.game_id;
+
+    let res = req.post(link).send();
+
+    match res {
+      Ok(res) => {
+        let data: Result<Response, reqwest::Error> = res.json();
+        match data {
+          Ok(data) => {
+            if data.err {
+              return Err(data.msg);
+            } else {
+              if data.isLobbyFull.unwrap() {
+                return Err("lobby full!".to_string());
+              } else {
+                self.lobby.name = data.lobbyName.unwrap();
+                return Ok(true);
+              }
+            }
+          },
+          Err(e) => return Err(e.to_string())
+        }
+      },
+      Err(e) => return Err(e.to_string())
+    }
   }
 
   pub fn create_and_start(&mut self, terminal: &mut TerminalHandler) {
@@ -289,21 +374,7 @@ impl Online {
 
     match self.create_game() {
       Ok(()) => {
-        dbox.info("connecting game...");
-        terminal.root.draw_element(&dbox);
-        terminal.refresh().unwrap();
-
-        match self.connect_socket() {
-          Err(e) => {
-            dbox.error(e.as_str());
-            terminal.root.draw_element(&dbox);
-            terminal.refresh().unwrap();
-            terminal.getch();
-          },
-          Ok(socket) => {
-            self.join_lobby(socket, terminal);
-          }
-        }
+        self.connect_game(dbox, terminal);
       },
       Err(e) => { 
         dbox.error(e.as_str());
@@ -313,15 +384,4 @@ impl Online {
       }
     }
   }
-}
-
-pub fn is_game_exist(link: String) -> bool {
-  #[derive(Deserialize, Debug)]
-  struct Response {
-    lobbyName: Option<String>,
-    isLobbyFull: Option<bool>,
-    err: bool,
-    msg: String
-  }
-  false
 }

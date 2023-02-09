@@ -35,11 +35,15 @@ impl <W: Write> Terminal<W> {
     self.flush()
   }
 
-  pub fn draw_window(&mut self, win: &WindowRef) {
-    match self.handler.draw(win.inner().buffer().to_vec((0, 0)).into_iter()) {
-      Ok(()) => (),
-      Err(_) => panic!("error while drawing the buffer")
-    }
+  // pub fn draw_window(&mut self, win: &WindowRef) {
+    // match self.handler.draw(win.inner().buffer().to_vec((0, 0)).into_iter()) {
+      // Ok(()) => (),
+      // Err(_) => panic!("error while drawing the buffer")
+    // }
+  // }
+
+  pub fn draw_window(&mut self, win: &WindowRef) -> io::Result<()> {
+    self.handler.draw_window(win)
   }
 
   pub fn handle_input<F, R>(&mut self, func: F) -> R

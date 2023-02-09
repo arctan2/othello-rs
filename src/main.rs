@@ -99,7 +99,7 @@ fn main() {
               })
               .action("join game", &|terminal, ctx| -> Return {
                 Online::new(&mut terminal.root)
-                  .set_player('\0', &ctx.name)
+                  .set_player(0 as char, &ctx.name)
                   .join_and_start(terminal);
                 Return::None
               })

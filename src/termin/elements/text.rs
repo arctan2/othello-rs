@@ -21,7 +21,7 @@ impl Text {
     }
   }
 
-  pub fn get_rect(&self) -> Rect {
+  pub fn rect(&self) -> Rect {
     self.rect
   }
 

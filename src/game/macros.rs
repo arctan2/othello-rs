@@ -76,4 +76,27 @@ macro_rules! choose_side_win {
   }};
 }
 
-pub(crate) use choose_side_win;
+macro_rules! render_seq {
+  ($win:expr,{x: $x:expr,y: $y:expr},$first:expr,$first_gap:expr,$($el:expr,$gap:expr),+) => {
+    $first.set_xy($x, $y);
+    let (mut prev_left, mut prev_bottom) = ($x, $first.height() + $y + $first_gap);
+    $win.render_element(&$first);
+    $(
+      $el.set_xy(prev_left, prev_bottom);
+      $win.draw_element(&$el);
+      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
+    )+
+  };
+  ($win:expr,{x: $x:expr,y: $y:expr, gap: $gap:expr},$first:expr,$($el:expr),+) => {
+    $first.set_xy($x, $y);
+    let (mut prev_left, mut prev_bottom) = ($first.x(), $first.height() + $first.y() + $gap);
+    $win.render_element(&$first);
+    $(
+      $el.set_xy(prev_left, prev_bottom);
+      $win.draw_element(&$el);
+      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
+    )+
+  };
+}
+
+pub(crate) use {choose_side_win, render_seq};
