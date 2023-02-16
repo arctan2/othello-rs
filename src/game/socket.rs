@@ -1,7 +1,6 @@
-use std::net::TcpStream;
-
 use serde::{Serialize, Deserialize};
-use tungstenite::{WebSocket, stream::MaybeTlsStream};
+use tokio_tungstenite::{WebSocketStream, MaybeTlsStream};
+use tokio::net::TcpStream;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SocketMsg {
@@ -27,21 +26,21 @@ impl SocketMsg {
   }
 }
 
-pub type WS = WebSocket<MaybeTlsStream<TcpStream>>;
+pub type WS = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 macro_rules! emit {
-  ($socket:expr,$e:expr) => {
+  ($socket_writer:expr,$e:expr) => {
     match SocketMsg::to_string($e, "") {
-      Ok(msg) => match $socket.write_message(Message::Text(msg)) {
+      Ok(msg) => match $socket_writer.send(Message::Text(msg)).await {
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string())
       },
       Err(e) => Err(e.to_string())
     }
   };
-  ($socket:expr,$e:expr,$data:expr) => {
+  ($socket_writer:expr,$e:expr,$data:expr) => {
     match SocketMsg::to_string($e, &$data) {
-      Ok(msg) => match $socket.write_message(Message::Text(msg)) {
+      Ok(msg) => match $socket_writer.send(Message::Text(msg)).await {
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string())
       },
@@ -51,9 +50,9 @@ macro_rules! emit {
 }
 
 macro_rules! emit_json {
-  ($socket:expr,$e:expr,$data:expr) => {
+  ($socket_writer:expr,$e:expr,$data:expr) => {
     match SocketMsg::to_string($e, &$data) {
-      Ok(msg) => match $socket.write_message(Message::Text(msg)) {
+      Ok(msg) => match $socket_writer.send(Message::Text(msg)).await {
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string())
       },

@@ -1,15 +1,18 @@
+use std::time::Duration;
+
 use copypasta::{ClipboardContext, ClipboardProvider};
 use crossterm::style::Color;
 use reqwest::{Url, StatusCode};
 use serde::{Deserialize, Serialize};
-use tungstenite::Message;
+use tokio_tungstenite::{tungstenite::Message};
+use futures_util::{stream::{StreamExt, SplitSink}, SinkExt};
 
 use crate::{sleep, termin::{
   window::{Window, Position, WindowRef},
   terminal_window::TerminalHandler, elements::{Rectangle, Text, InputBox}
 }, custom_elements::DialogBox, game::macros::render_seq};
 
-use super::{socket::{WS, SocketMsg, emit_json}, board::{WHITE, Side}};
+use super::{socket::{WS ,SocketMsg, emit_json}, board::{WHITE, Side}};
 
 pub struct Online {
   player_name: String,
@@ -134,9 +137,9 @@ impl Online {
     }
   }
 
-  fn connect_socket(&mut self) -> Result<WS, String> {
+  async fn connect_socket(&mut self) -> Result<WS, String> {
     let url_str = "ws://localhost:5000/api/join-game/".to_string() + &self.game_id;
-    match tungstenite::connect(Url::parse(&url_str).unwrap()) {
+    match tokio_tungstenite::connect_async(Url::parse(&url_str).unwrap()).await {
       Ok((socket, res)) => {
         if res.status() != StatusCode::SWITCHING_PROTOCOLS {
           return Err("something went wrong".to_string());
@@ -152,7 +155,11 @@ impl Online {
     ClipboardContext::new().unwrap().set_contents(String::from(url_str).to_owned()).unwrap();
   }
 
-  fn handle_join_lobby_socket(&mut self, socket: &mut WS, msg: SocketMsg, terminal: &mut TerminalHandler) -> bool {
+  async fn handle_lobby_socket(
+    &mut self, socket_w: &mut SplitSink<WS, Message>,
+    msg: SocketMsg,
+    terminal: &mut TerminalHandler
+  ) -> bool {
     let mut dbox = DialogBox::new(35, 5)
                   .position(terminal.root.rect(), Position::Coord(5, 5))
                   .text("");
@@ -167,7 +174,7 @@ impl Online {
             playerName: self.player_name.clone(), side: self.side as u8, isReconnect: false, playerId: "".to_string()
           };
 
-          match emit_json!(socket, "join-player-info", player_info) {
+          match emit_json!(socket_w, "join-player-info", player_info) {
             Ok(_) => {
               dbox.info("joining lobby...");
               terminal.root.draw_element(&dbox);
@@ -190,12 +197,15 @@ impl Online {
           side: Option<u8> 
         }
         let msg: JoinPlayerInfoRes = msg.parse();
+
         if msg.err {
           dbox.error(&msg.msg);
           terminal.root.draw_element(&dbox);
         } else {
           self.lobby.render(terminal);
           self.copy_link_to_clipboard();
+          self.side = msg.side.unwrap() as Side;
+          self.player_id = msg.playerId.unwrap();
         }
       },
       "lobby-info" => {
@@ -228,18 +238,27 @@ impl Online {
     false
   }
 
-  fn join_lobby(&mut self, mut socket: WS, terminal: &mut TerminalHandler) {
+  async fn join_lobby(&mut self, socket: WS, terminal: &mut TerminalHandler) {
     terminal.clear();
+    let (mut write, mut read) = socket.split();
 
     loop {
-      match socket.read_message().unwrap() {
-        Message::Text(t) => {
-          let msg = SocketMsg::from(t);
-          if self.handle_join_lobby_socket(&mut socket, msg, terminal) {
-            break
+      let msg = read.next().await.unwrap();
+      match msg {
+        Ok(msg) => {
+          match msg {
+            Message::Text(t) => {
+              let msg = SocketMsg::from(t);
+              if self.handle_lobby_socket(&mut write, msg, terminal).await {
+                return;
+              }
+            },
+            _ => ()
           }
         },
-        _ => ()
+        Err(e) => {
+          panic!("{}", e.to_string());
+        }
       }
     }
   }
@@ -249,17 +268,20 @@ impl Online {
     terminal.root.draw_element(&dbox);
     terminal.refresh().unwrap();
 
-    match self.connect_socket() {
-      Err(e) => {
-        dbox.error(e.as_str());
-        terminal.root.draw_element(&dbox);
-        terminal.refresh().unwrap();
-        terminal.getch();
-      },
-      Ok(socket) => {
-        self.join_lobby(socket, terminal);
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+      match self.connect_socket().await {
+        Err(e) => {
+          dbox.error(e.as_str());
+          terminal.root.draw_element(&dbox);
+          terminal.refresh().unwrap();
+          terminal.getch();
+        },
+        Ok(socket) => {
+          self.join_lobby(socket, terminal).await;
+        }
       }
-    }
+    });
   }
 
   pub fn join_and_start(&mut self, terminal: &mut TerminalHandler) {
@@ -295,7 +317,7 @@ impl Online {
 
     match self.is_game_exist() {
       Ok(is_exist) => {
-        if is_exist {
+        if is_exist { 
           self.connect_game(dbox, terminal);
         } else {
           dbox.error("game doesn't exist!");
