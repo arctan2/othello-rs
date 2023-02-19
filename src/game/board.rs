@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crossterm::style::Color;
 
-use crate::{termin::{window::WindowRef, elements::{Rectangle, Text}}, sleep};
+use crate::{termin::{window::WindowRef, elements::{Rectangle, Text}}};
 
 pub const BLACK: Side = 'b';
 pub const WHITE: Side = 'w';
@@ -16,12 +16,14 @@ pub const FIX: i8 = 0;
 
 pub type Side = char;
 
+#[derive(Debug)]
 struct Cursor {
 	x: u16,
 	y: u16,
 	el: Rectangle
 }
 
+#[derive(Debug)]
 pub struct Board {
   pub board: [[Side; 8]; 8],
   pub board_container: WindowRef,

@@ -1,6 +1,7 @@
 pub mod board;
-pub mod offline;
-pub mod online;
+pub mod offline_game;
+mod online_game;
+pub mod online_lobby;
 pub mod macros;
 pub mod socket;
 
@@ -9,14 +10,15 @@ use std::io::Write;
 use board::Board;
 use crossterm::{style::Color, event::KeyCode};
 
-use crate::termin::{window::{WindowRef, Window, Position::{Coord, self}}, terminal_window::Terminal, elements::{Rectangle, Text}};
+use crate::termin::{window::{WindowRef, Window, Position}, terminal_window::Terminal, elements::{Rectangle, Text}};
 
 use self::board::{BLACK, WHITE, UP, FIX, DOWN, LEFT, RIGHT, Side};
 
+#[derive(Debug)]
 pub struct Game {
 	pub board: Board,
+	pub cur_turn_side_win: WindowRef,
 	cur_turn_side: Side,
-	cur_turn_side_win: WindowRef,
 	render_cursor: bool,
 	render_available_moves: bool,
 	is_over: bool,

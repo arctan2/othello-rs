@@ -130,7 +130,7 @@ impl <'a, T> Menu <'a, T> {
         Event::Key(k) => {
           match k.code {
             KeyCode::Esc => {
-              RETURN!(All);
+              RETURN!(Back);
             },
             KeyCode::Down => {
               self.cursor += 1;

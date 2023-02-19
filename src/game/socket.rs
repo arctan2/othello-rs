@@ -30,7 +30,7 @@ pub type WS = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 macro_rules! emit {
   ($socket_writer:expr,$e:expr) => {
-    match SocketMsg::to_string($e, "") {
+    match SocketMsg::to_string($e, &"".to_string()) {
       Ok(msg) => match $socket_writer.send(Message::Text(msg)).await {
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string())

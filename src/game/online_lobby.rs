@@ -1,19 +1,20 @@
-use std::time::Duration;
+#![allow(non_snake_case)]
 
 use copypasta::{ClipboardContext, ClipboardProvider};
 use crossterm::style::Color;
 use reqwest::{Url, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::{tungstenite::Message};
-use futures_util::{stream::{StreamExt, SplitSink}, SinkExt};
+use futures_util::{stream::StreamExt, SinkExt};
 
 use crate::{sleep, termin::{
   window::{Window, Position, WindowRef},
   terminal_window::TerminalHandler, elements::{Rectangle, Text, InputBox}
 }, custom_elements::DialogBox, game::macros::render_seq};
 
-use super::{socket::{WS ,SocketMsg, emit_json}, board::{WHITE, Side}};
+use super::{socket::{WS ,SocketMsg, emit_json}, board::Side, online_game::OnlineGame};
 
+#[derive(Debug)]
 pub struct Online {
   player_name: String,
   lobby: Lobby,
@@ -34,6 +35,7 @@ impl Online {
   }
 }
 
+#[derive(Debug)]
 struct Lobby {
   name: String,
   white_name: String,
@@ -89,6 +91,12 @@ struct PlayerInfo {
   side: u8,
   isReconnect: bool,
   playerId: String
+}
+
+enum NextGameState {
+  StartGame,
+  Error(String),
+  Continue
 }
 
 impl Online {
@@ -156,34 +164,29 @@ impl Online {
   }
 
   async fn handle_lobby_socket(
-    &mut self, socket_w: &mut SplitSink<WS, Message>,
+    &mut self,
+    socket: &mut WS,
     msg: SocketMsg,
+    dbox: &mut DialogBox,
     terminal: &mut TerminalHandler
-  ) -> bool {
-    let mut dbox = DialogBox::new(35, 5)
-                  .position(terminal.root.rect(), Position::Coord(5, 5))
-                  .text("");
-
+  ) -> NextGameState {
     match msg.event_name() {
       "game-verified" => {
         if !msg.parse::<bool>() {
-          dbox.error("game not found :(");
-          terminal.root.draw_element(&dbox);
+          return NextGameState::Error("game not fount :(".to_string());
         } else {
           let player_info = PlayerInfo{
             playerName: self.player_name.clone(), side: self.side as u8, isReconnect: false, playerId: "".to_string()
           };
 
-          match emit_json!(socket_w, "join-player-info", player_info) {
+          match emit_json!(socket, "join-player-info", player_info) {
             Ok(_) => {
               dbox.info("joining lobby...");
-              terminal.root.draw_element(&dbox);
+              terminal.root.draw_element(dbox);
               terminal.refresh().unwrap();
             },
             Err(e) => {
-              dbox.error(e.as_str());
-              terminal.root.draw_element(&dbox);
-              terminal.refresh().unwrap();
+              return NextGameState::Error(e.to_string());
             }
           }
         }
@@ -199,8 +202,7 @@ impl Online {
         let msg: JoinPlayerInfoRes = msg.parse();
 
         if msg.err {
-          dbox.error(&msg.msg);
-          terminal.root.draw_element(&dbox);
+          return NextGameState::Error(msg.msg);
         } else {
           self.lobby.render(terminal);
           self.copy_link_to_clipboard();
@@ -229,35 +231,63 @@ impl Online {
           terminal.flush().unwrap();
           sleep(1000);
         }
-
-        terminal.getch();
-        return true;
+        return NextGameState::StartGame
       },
       _ => ()
     }
-    false
+    NextGameState::Continue
   }
 
-  async fn join_lobby(&mut self, socket: WS, terminal: &mut TerminalHandler) {
+  async fn join_lobby(&mut self, mut socket: WS, terminal: &mut TerminalHandler) {
     terminal.clear();
-    let (mut write, mut read) = socket.split();
+    let mut dbox = DialogBox::new(35, 5)
+                  .position(terminal.root.rect(), Position::Coord(5, 5))
+                  .text("");
 
     loop {
-      let msg = read.next().await.unwrap();
+      let msg = socket.next().await.unwrap();
       match msg {
         Ok(msg) => {
           match msg {
             Message::Text(t) => {
               let msg = SocketMsg::from(t);
-              if self.handle_lobby_socket(&mut write, msg, terminal).await {
-                return;
+              match self.handle_lobby_socket(&mut socket, msg, &mut dbox, terminal).await {
+                NextGameState::Continue => continue,
+                NextGameState::StartGame => {
+                  self.lobby.game_status_win.delete();
+                  self.lobby.lobby_win.delete();
+
+                  let mut game = OnlineGame::new(
+                    if self.side == 'w' {
+                      self.lobby.black_name.clone()
+                    } else {
+                      self.lobby.white_name.clone()
+                    },
+                    self.side,
+                    terminal
+                  );
+
+                  game.begin_game(terminal, socket).await;
+                  return
+                },
+                NextGameState::Error(e) => {
+                  dbox.error(&e);
+                  terminal.root.draw_element(&dbox);
+                  terminal.refresh().unwrap();
+                  terminal.getch();
+                  return;
+                }
               }
             },
             _ => ()
           }
         },
         Err(e) => {
-          panic!("{}", e.to_string());
+          dbox.error(&e.to_string());
+          terminal.root.draw_element(&dbox);
+          terminal.refresh().unwrap();
+          terminal.getch();
+          return;
         }
       }
     }

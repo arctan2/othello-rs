@@ -35,6 +35,16 @@ impl <W: Write> Terminal<W> {
     self.flush()
   }
 
+  pub fn refresh_clear(&mut self) -> io::Result<()> {
+    match self.refresh() {
+      Ok(()) => {
+        self.clear();
+        return Ok(())
+      },
+      Err(e) => return Err(e)
+    }
+  }
+
   // pub fn draw_window(&mut self, win: &WindowRef) {
     // match self.handler.draw(win.inner().buffer().to_vec((0, 0)).into_iter()) {
       // Ok(()) => (),

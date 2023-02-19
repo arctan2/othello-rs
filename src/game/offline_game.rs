@@ -1,13 +1,9 @@
-use std::io::Write;
-
-use crossterm::{style::{Color, Attribute}, event::KeyCode};
 use rand::Rng;
 
-use crate::{
+use crate::{ 
   termin::{
-    terminal_window::Terminal,
-    window::{Window, draw_elements, Position::*}, 
-    elements::Text
+    terminal_window::TerminalHandler,
+    window::{Window, draw_elements}, 
   },
   sleep,
   menu::Return, game::macros::choose_side_win
@@ -32,7 +28,7 @@ fn rand_item_from_vec<T: Copy>(v: &Vec<T>) -> T {
 }
 
 impl Offline {
-  pub fn begin_game<W: Write>(&self, terminal: &mut Terminal<W>) {
+  pub fn begin_game(&self, terminal: &mut TerminalHandler) {
     terminal.clear();
     let mut offline_win = terminal.root.new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
     let mut game = Game::new(offline_win.clone());
@@ -51,7 +47,7 @@ impl Offline {
           } else {
             sleep(1000);
           }
-
+          
           game.toggle_side();
           cur_turn = if game.cur_turn_side == WHITE { self.white } else { self.black };
         },
@@ -93,12 +89,12 @@ impl Offline {
   }
 }
 
-pub fn play_offline<W: Write, Ctx>(terminal: &mut Terminal<W>, _: &mut Ctx, no_of_players: u8) -> Return {
+pub fn play_offline<Ctx>(terminal: &mut TerminalHandler, _: &mut Ctx, no_of_players: u8) -> Return {
   let cur_side = choose_side_win!(
     terminal, "Play Offline", if no_of_players == 1 { "Choose your side:" } else { "Choose Player 1 side: " }
   );
 
-  use crate::game::offline::ParticipantType::{Player, Bot};
+  use crate::game::offline_game::ParticipantType::{Player, Bot};
 
   if no_of_players == 2 {
     Offline{ black: Player, white: Player }

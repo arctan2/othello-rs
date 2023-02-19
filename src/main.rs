@@ -8,20 +8,17 @@ use std::thread;
 use std::io::stdout;
 use crossterm::{
   terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-  execute, cursor, style::Color
+  execute, cursor
 };
-use custom_elements::DialogBox;
 use game::macros::choose_side_win;
-use game::online::Online;
+use game::online_lobby::Online;
 use menu::{Menu, Return};
 use termin::elements::Text;
 use termin::terminal_window::TerminalHandler;
 use termin::window::{Window, Position::*};
-use termin::{
-  crossterm_handler::CrosstermHandler
-};
+use termin::crossterm_handler::CrosstermHandler;
 
-use crate::game::offline::play_offline;
+use crate::game::offline_game::play_offline;
 use crate::termin::elements::InputBox;
 
 fn sleep(ms: u64) {
@@ -88,7 +85,7 @@ fn main() {
               })
               .back("back")
             )
-            .sub_menu("online", 
+            .sub_menu("online",
               Menu::<Ctx>::new("Online")
               .action("create game", &|terminal, ctx| -> Return {
                 let host_side = choose_side_win!(terminal, "Create Game Online", "Choose your side:");
