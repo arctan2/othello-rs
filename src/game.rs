@@ -136,24 +136,29 @@ impl Game {
 		border.delete();
 	}
 
+	pub fn keyboard_event(&mut self, k: KeyCode) -> bool {
+		match k {
+			KeyCode::Up => self.board.move_cursor_rel(FIX, UP),
+			KeyCode::Down => self.board.move_cursor_rel(FIX, DOWN),
+			KeyCode::Left => self.board.move_cursor_rel(LEFT, FIX),
+			KeyCode::Right => self.board.move_cursor_rel(RIGHT, FIX),
+			KeyCode::Enter => {
+				self.play_move();
+				return true;
+			},
+			KeyCode::Esc => return true,
+			_ => ()
+		}
+		return false;
+	}
+
 	pub fn enable_cursor_movement<W: Write>(&mut self, terminal: &mut Terminal<W>) {
 		self.render_cursor = true;
 		self.render_available_moves = true;
 		self.render_board();
 		terminal.refresh().unwrap();
 		loop {
-			match terminal.getch() {
-				KeyCode::Up => self.board.move_cursor_rel(FIX, UP),
-				KeyCode::Down => self.board.move_cursor_rel(FIX, DOWN),
-				KeyCode::Left => self.board.move_cursor_rel(LEFT, FIX),
-				KeyCode::Right => self.board.move_cursor_rel(RIGHT, FIX),
-				KeyCode::Enter => {
-					self.play_move();
-					break;
-				},
-				KeyCode::Esc => break,
-				_ => ()
-			}
+			if self.keyboard_event(terminal.getch()) { break }
 			self.render_board();
 			terminal.refresh().unwrap();
 		}

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crossterm::style::Color;
 
-use crate::{termin::{window::WindowRef, elements::{Rectangle, Text}}};
+use crate::termin::{window::WindowRef, elements::{Rectangle, Text}};
 
 pub const BLACK: Side = 'b';
 pub const WHITE: Side = 'w';
@@ -283,8 +283,8 @@ impl Board {
     let opponent_side = self.opponent_of(for_side);
     let mut available_moves: HashMap<usize, Vec<usize>> = HashMap::new();
 
-    for i in 0..self.board.len() {
-      for j in 0..self.board[i].len() {
+    for i in 0..8 {
+      for j in 0..8 {
         if self.board[i][j] != for_side { continue; }
         for (vertic, horiz) in TRAV_ARR {
           let (f, r, c) = self.traverse_from(i as i8, j as i8, vertic, horiz, EMPTY, opponent_side);
