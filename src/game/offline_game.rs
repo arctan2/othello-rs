@@ -79,7 +79,7 @@ impl Offline {
       terminal.refresh().unwrap();
     }
 
-    game.render_game_over(&mut offline_win);
+    game.render_game_over(&mut offline_win, "");
 
     terminal.refresh().unwrap();
 

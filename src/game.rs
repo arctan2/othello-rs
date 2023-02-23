@@ -110,7 +110,15 @@ impl Game {
 		self.board.play_move(self.cur_turn_side);
 	}
 
-	pub fn render_game_over(&mut self, win: &mut WindowRef) {
+	pub fn is_game_draw(&self) -> bool {
+		self.board.black_points == self.board.white_points
+	}
+
+	pub fn is_white_won(&self) -> bool {
+		self.board.white_points > self.board.black_points
+	}
+
+	pub fn render_game_over(&mut self, win: &mut WindowRef, msg: &str) {
     self.board.calc_points();
     let mut border = win.new_child(Window::default().bg(Color::Green).size(24, 7).xy(6, 7));
     let mut game_over_win = border.new_child(Window::default().size(20, 5));
@@ -120,13 +128,17 @@ impl Game {
     text_box.set_xy_rel(0, 1);
     game_over_win.draw_element(&text_box);
     
-    text_box.set_text(if self.board.black_points > self.board.white_points {
-      "Black won"
-    } else if self.board.white_points > self.board.black_points {
-      "White won"
-    } else {
-      "Draw"
-    });
+		if msg == "" {
+			text_box.set_text(if self.board.black_points > self.board.white_points {
+				"Black won"
+			} else if self.board.white_points > self.board.black_points {
+				"White won"
+			} else {
+				"Draw"
+			});
+		} else {
+			text_box.set_text(msg);
+		}
 		text_box.width_fit();
     text_box.set_xy_rel(0, 2);
     game_over_win.draw_element(&text_box);

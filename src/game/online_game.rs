@@ -9,7 +9,7 @@ use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt, FutureExt};
 
 use crate::{termin::{terminal_window::TerminalHandler, window::{Window, Position, WindowRef}}, custom_elements::DialogBox, game::{board::EMPTY, socket::emit_json}, sleep};
-use super::{Game, socket::{WS, emit, SocketMsg}, board::Side};
+use super::{Game, socket::{WS, emit, SocketMsg}, board::{Side, WHITE}};
 
 #[derive(Debug)]
 pub struct OnlineGame {
@@ -25,6 +25,12 @@ pub struct OnlineGame {
 struct MoveDetails {
   rowIdx: u16,
   colIdx: u16
+}
+
+enum GameStatus {
+  GameOver(String),
+  WaitForReconnect,
+  Continue
 }
 
 impl OnlineGame {
@@ -118,26 +124,34 @@ impl OnlineGame {
   fn play_move(&mut self) {
     self.game.play_move();
     self.game.toggle_side();
+    self.game.render_cur_turn_side();
   }
 
-  fn handle_socket_msg(&mut self, terminal: &mut TerminalHandler, msg: SocketMsg) {
+  fn handle_socket_msg(&mut self, terminal: &mut TerminalHandler, msg: SocketMsg) -> GameStatus {
     match msg.event_name() {
 	    "cur-turn" => {
         self.set_cur_turn_true();
 
         self.game.render_board();
         terminal.refresh().unwrap();
+        GameStatus::Continue
       },
       "opponent-move" => {
         let opponent_move: MoveDetails = msg.parse();
         self.game.board.move_cursor(opponent_move.colIdx, opponent_move.rowIdx);
         self.play_move();
+        GameStatus::Continue
+      },
+      "game-over" => {
+        GameStatus::GameOver(msg.data)
       },
       "wait-for-opponent-reconnect" => {
+        GameStatus::WaitForReconnect
       },
       "chat-msg" => {
+        GameStatus::Continue
       },
-      _ => ()
+      _ => GameStatus::Continue
     }
   }
 
@@ -206,7 +220,39 @@ impl OnlineGame {
           match socket_ev {
             Some(maybe_msg) => match maybe_msg {
               Ok(msg) => match msg {
-                  Message::Text(msg) => self.handle_socket_msg(terminal, SocketMsg::from(msg)),
+                  Message::Text(msg) => {
+                    match self.handle_socket_msg(terminal, SocketMsg::from(msg)) {
+                      GameStatus::GameOver(msg) => {
+                        if msg != "" {
+                          self.game.render_game_over(&mut self.online_win, &msg);
+                        } else {
+                          self.game.render_game_over(&mut self.online_win, if self.game.is_game_draw() {
+                            "Draw"
+                          } else if self.my_side == WHITE {
+                            if self.game.is_white_won() {
+                              "you won :)"
+                            } else {
+                              "you lost :("
+                            }
+                          } else {
+                            if self.game.is_white_won() {
+                              "you lost :("
+                            } else {
+                              "you won :)"
+                            }
+                          });
+                        }
+                        terminal.refresh().unwrap();
+                        terminal.getch();
+                        break;
+                      },
+                      GameStatus::Continue => {
+                        continue
+                      },
+                      GameStatus::WaitForReconnect => {
+                      }
+                    }
+                  },
                   _ => ()
               },
               Err(_) => ()
@@ -216,13 +262,6 @@ impl OnlineGame {
         }
       };
     }
-
-
-    self.game.render_game_over(&mut self.online_win);
-
-    terminal.refresh().unwrap();
-
-    terminal.getch();
 
     self.online_win.delete();
   }
