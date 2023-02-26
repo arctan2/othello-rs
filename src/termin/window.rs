@@ -42,7 +42,7 @@ impl Window {
 
   pub fn new(width: u16, height: u16, x: u16, y: u16) -> Self {
     Window {
-      buffer: Buffer::empty(Rect::new(x, y, width, height)),
+      buffer: Buffer::empty(Rect::new(x, y, width, height), Rect::new(x, y, width, height)),
       sub_windows: vec![],
       parent: Weak::new(),
       id: 0
@@ -69,6 +69,37 @@ impl Window {
         }
       }
     }
+  }
+
+  pub fn scoll_size(mut self, width: u16, height: u16) -> Self {
+    self.set_scroll_size(width, height);
+    self
+  }
+
+  pub fn set_scroll_size(&mut self, width: u16, height: u16) {
+    self.buffer.set_scroll_size(width, height);
+  }
+
+  pub fn set_scroll_xy(&mut self, x: u16, y: u16) {
+    self.buffer.set_scroll_xy(x, y);
+  }
+
+  pub fn set_scroll_xy_rel(&mut self, dx: i16, dy: i16) {
+    let mut x = self.buffer.scroll().x as i16 + dx;
+    let mut y = self.buffer.scroll().y as i16 + dy;
+
+    if x < 0 {
+      x = 0;
+    }
+    if y < 0 {
+      y = 0;
+    }
+
+    self.set_scroll_xy(x as u16, y as u16);
+  }
+
+  pub fn scroll(&self) -> Rect {
+    self.buffer.scroll()
   }
 
   pub fn width(&self) -> u16 {
@@ -111,7 +142,8 @@ impl Window {
   pub fn set_size(&mut self, width: u16, height: u16) {
     let mut c = Cell::default();
     c.bg = self.buffer.get_bg();
-    self.buffer = Buffer::filled(Rect::new(self.buffer.left(), self.buffer.top(), width, height), c);
+    let r = Rect::new(self.buffer.left(), self.buffer.top(), width, height);
+    self.buffer = Buffer::filled(r, r, c);
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {
@@ -284,13 +316,9 @@ impl Window {
 pub struct WindowRef(WinRef);
 
 impl WindowRef {
-  pub fn default() -> Self {
-    Self::from_window(Window::default())
-  }
-
   pub fn new(width: u16, height: u16, x: u16, y: u16) -> Self {
     WindowRef(Rc::new(RefCell::new(Window {
-      buffer: Buffer::empty(Rect::new(x, y, width, height)),
+      buffer: Buffer::empty(Rect::new(x, y, width, height), Rect::new(x, y, width, height)),
       sub_windows: vec![],
       parent: Weak::new(),
       id: 0
@@ -370,6 +398,22 @@ impl WindowRef {
 
   pub fn right(&self) -> u16 {
     self.inner().right()
+  }
+
+  pub fn set_scroll_size(&mut self, width: u16, height: u16) {
+    self.inner_mut().set_scroll_size(width, height);
+  }
+
+  pub fn set_scroll_xy(&mut self, x: u16, y: u16) {
+    self.inner_mut().set_scroll_xy(x, y);
+  }
+
+  pub fn set_scroll_xy_rel(&mut self, dx: i16, dy: i16) {
+    self.inner_mut().set_scroll_xy_rel(dx, dy);
+  }
+
+  pub fn scroll(&self) -> Rect {
+    self.inner().scroll()
   }
 
   pub fn parent(&self) -> Weak<RefCell<Window>> {

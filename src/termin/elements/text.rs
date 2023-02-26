@@ -70,7 +70,7 @@ impl Text {
   }
 
   pub fn chop_after(&mut self, idx: usize) {
-    self.text.split_off(idx);
+    _ = self.text.split_off(idx);
   }
 
   pub fn add_char_at(&mut self, idx: usize, ch: char) {
@@ -111,26 +111,41 @@ impl Element for Text {
     let mut text = self.text.chars();
     let (start_x, start_y) = self.start_text;
 
-    let mut set_cell = |x, y| {
+    enum Char {
+      NewLine,
+      Other
+    }
+
+    let mut set_cell = |x, y| -> Char {
       let c = buf.get_mut(x, y);
       c.set_fg(self.fg);
 
       match text.next() {
         Some(sym) => {
+          if sym == '\n' {
+            return Char::NewLine
+          }
           c.set_symbol(sym);
           c.set_attr(self.attr);
+          Char::Other
         },
-        None => ()
+        None => Char::Other
       }
     };
 
     for x in start_x..self.rect.width {
-      set_cell(self.rect.x + x, self.rect.y + start_y);
+      match set_cell(self.rect.x + x, self.rect.y) {
+        Char::NewLine => break,
+        _ => continue
+      }
     }
 
     for y in start_y + 1..self.rect.height {
       for x in 0..self.rect.width {
-        set_cell(self.rect.x + x, self.rect.y + y);
+        match set_cell(self.rect.x + x, self.rect.y + y) {
+          Char::NewLine => break,
+          _ => continue
+        }
       }
     }
   }

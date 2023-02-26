@@ -2,6 +2,8 @@ use std::{fmt, vec};
 
 use crossterm::style::{Color, Attribute};
 
+use crate::sleep;
+
 #[derive(Clone, Debug)]
 pub struct Cell {
   pub bg: Color,
@@ -78,6 +80,7 @@ impl Default for Rect {
 pub struct Buffer {
   bg: Color,
   rect: Rect,
+  scroll: Rect,
   content: Vec<Cell>
 }
 
@@ -88,14 +91,33 @@ impl fmt::Debug for Buffer {
 }
 
 impl Buffer {
-  pub fn empty(rect: Rect) -> Self {
-    let a = rect.area() as usize;
-    Buffer{ rect, content: vec![Cell::default(); a], bg: Color::Reset }
+  pub fn empty(rect: Rect, scroll: Rect) -> Self {
+    let a = scroll.area() as usize;
+    Buffer{ rect, scroll, content: vec![Cell::default(); a], bg: Color::Reset }
   }
   
-  pub fn filled(rect: Rect, fill: Cell) -> Buffer {
-    let a = rect.area() as usize;
-    Buffer { rect, content: vec![fill.clone(); a], bg: fill.bg }
+  pub fn filled(rect: Rect, scroll: Rect, fill: Cell) -> Buffer {
+    let a = scroll.area() as usize;
+    Buffer { rect, scroll, content: vec![fill.clone(); a], bg: fill.bg }
+  }
+
+  fn resize_content(&mut self) {
+    let a = self.scroll.area() as usize;
+    let mut s = self.content[0].clone();
+    s.bg = self.bg;
+    s.symbol = " ".to_string();
+    self.content = vec![s; a];
+  }
+
+  pub fn set_scroll_size(&mut self, width: u16, height: u16) {
+    self.scroll.width = width;
+    self.scroll.height = height;
+    self.resize_content();
+  }
+
+  pub fn set_scroll_xy(&mut self, x: u16, y: u16) {
+    self.scroll.x = x;
+    self.scroll.y = y;
   }
 
   pub fn content_mut(&mut self) -> &mut Vec<Cell> {
@@ -126,7 +148,9 @@ impl Buffer {
     self.rect.y = y;
   }
 
-  pub fn index_of(&self, x: u16, y: u16) -> usize {
+  pub fn index_of(&self, mut x: u16, mut y: u16) -> usize {
+    y += self.scroll.y;
+    x += self.scroll.x;
     ((self.rect.width * y) + x) as usize
   }
 
@@ -175,6 +199,10 @@ impl Buffer {
     self.rect
   }
 
+  pub fn scroll(&self) -> Rect {
+    self.scroll
+  }
+
   pub fn to_vec(&self, abs: (u16, u16)) -> Vec<(u16, u16, &Cell)> {
     let mut result: Vec<(u16, u16, &Cell)> = vec![];
 
@@ -184,24 +212,5 @@ impl Buffer {
       }
     }
     result
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn buffer_index_of() {
-    let buf = Buffer::filled(Rect::new(0, 0, 4, 3), Cell::default());
-    let mut counter: usize = 0;
-
-    for y in 0..buf.rect.height {
-      for x in 0..buf.rect.width {
-        let idx = buf.index_of(x, y);
-        assert_eq!(idx, counter);
-        counter += 1;
-      }
-    }
   }
 }

@@ -112,3 +112,36 @@ fn main() {
   execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
   disable_raw_mode().unwrap();
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn scroll() {
+    enable_raw_mode().unwrap();
+    execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
+    let mut terminal = termin::root(CrosstermHandler::new(stdout()));
+
+    let mut win = terminal.root.new_child(Window::default().size(50, 10).scoll_size(50, 50).bg(crossterm::style::Color::Blue));
+    let mut tex = String::new();
+
+    for i in 0..40 {
+      tex += &("some text ".to_string() + &i.to_string() + "\n");
+    }
+
+    let t = Text::default().text(&tex).size(20, 50);
+
+    win.draw_element(&t);
+
+    for _ in 0..40 {
+      win.set_scroll_xy_rel(0, 1);
+      win.render();
+      terminal.refresh().unwrap();
+      terminal.getch();
+    }
+
+    execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
+    disable_raw_mode().unwrap();
+  }
+}
