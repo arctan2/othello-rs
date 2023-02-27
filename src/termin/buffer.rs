@@ -116,8 +116,12 @@ impl Buffer {
   }
 
   pub fn set_scroll_xy(&mut self, x: u16, y: u16) {
-    self.scroll.x = x;
-    self.scroll.y = y;
+    if x + self.rect.width <= self.scroll.width {
+      self.scroll.x = x;
+    }
+    if y + self.rect.height <= self.scroll.height {
+      self.scroll.y = y;
+    }
   }
 
   pub fn content_mut(&mut self) -> &mut Vec<Cell> {
@@ -151,7 +155,7 @@ impl Buffer {
   pub fn index_of(&self, mut x: u16, mut y: u16) -> usize {
     y += self.scroll.y;
     x += self.scroll.x;
-    ((self.rect.width * y) + x) as usize
+    ((self.scroll.width * y) + x) as usize
   }
 
   pub fn size(&self) -> usize {

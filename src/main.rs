@@ -115,7 +115,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use crossterm::event::KeyCode;
+
+use super::*;
 
   #[test]
   fn scroll() {
@@ -123,22 +125,44 @@ mod tests {
     execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
     let mut terminal = termin::root(CrosstermHandler::new(stdout()));
 
-    let mut win = terminal.root.new_child(Window::default().size(50, 10).scoll_size(50, 50).bg(crossterm::style::Color::Blue));
+    let mut win = terminal.root.new_child(Window::default().size(50, 10).scoll_size(80, 50).bg(crossterm::style::Color::Blue));
     let mut tex = String::new();
 
-    for i in 0..40 {
+    for i in 0..50 {
       tex += &("some text ".to_string() + &i.to_string() + "\n");
     }
 
     let t = Text::default().text(&tex).size(20, 50);
 
     win.draw_element(&t);
+    win.render();
+    terminal.refresh().unwrap();
 
-    for _ in 0..40 {
-      win.set_scroll_xy_rel(0, 1);
-      win.render();
-      terminal.refresh().unwrap();
-      terminal.getch();
+    loop {
+      match terminal.getch() {
+        KeyCode::Esc => break,
+        KeyCode::Left => {
+          win.set_scroll_xy_rel(-1, 0);
+          win.render();
+          terminal.refresh().unwrap();
+        },
+        KeyCode::Right => {
+          win.set_scroll_xy_rel(1, 0);
+          win.render();
+          terminal.refresh().unwrap();
+        },
+        KeyCode::Up => {
+          win.set_scroll_xy_rel(0, -1);
+          win.render();
+          terminal.refresh().unwrap();
+        },
+        KeyCode::Down => {
+          win.set_scroll_xy_rel(0, 1);
+          win.render();
+          terminal.refresh().unwrap();
+        }
+        _ => ()
+      }
     }
 
     execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
