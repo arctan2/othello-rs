@@ -49,6 +49,7 @@ macro_rules! emit {
   };
 }
 
+// must be inside async
 macro_rules! emit_json {
   ($socket_writer:expr,$e:expr,$data:expr) => {
     match SocketMsg::to_string($e, &$data) {

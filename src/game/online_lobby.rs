@@ -9,7 +9,7 @@ use futures_util::{stream::StreamExt, SinkExt};
 
 use crate::{sleep, termin::{
   window::{Window, Position, WindowRef},
-  terminal_window::TerminalHandler, elements::{Rectangle, Text, InputBox}
+  terminal_window::TerminalHandler, elements::{Rectangle, Text, InputWindow}
 }, custom_elements::DialogBox, game::macros::render_seq};
 
 use super::{socket::{WS ,SocketMsg, emit_json}, board::Side, online_game::OnlineGame};
@@ -319,10 +319,13 @@ impl Online {
     let game_link = terminal.handle_input(|handler, root| -> String {
       let mut input_win = root.new_child(Window::default().size(50, 10));
       let label = Text::default().text("game link: ").xy(0, 2);
-      let mut input = InputBox::default()
-                      .max_len(60)
-                      .position(label.x() + label.width(), label.y())
-                      .size(25, 3).start_text((0, 0));
+      let mut input = InputWindow::from(&mut input_win,
+                        Window::default()
+                        .xy(label.x() + label.width(), label.y())
+                        .size(25, 3)
+                      )
+                      .start_text((0, 0))
+                      .max_len(60);
 
       input_win.set_xy_rel(2, 2);
       input_win.draw_element(&label);
@@ -331,7 +334,7 @@ impl Online {
 
       handler.draw_window(&root).unwrap();
 
-      let new_name = input_win.read_string(&mut input, handler);
+      let new_name = input.read_string(handler);
       input_win.delete();
       new_name
     });

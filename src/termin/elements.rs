@@ -12,7 +12,7 @@ mod input;
 
 pub use rectangle::Rectangle;
 pub use text::Text;
-pub use input::InputBox;
+pub use input::InputWindow;
 
 macro_rules! impl_setters {
   ($struct_name:ident) => {

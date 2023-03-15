@@ -19,32 +19,34 @@ use termin::window::{Window, Position::*};
 use termin::crossterm_handler::CrosstermHandler;
 
 use crate::game::offline_game::play_offline;
-use crate::termin::elements::InputBox;
+use crate::termin::elements::InputWindow;
 
 fn sleep(ms: u64) {
   thread::sleep(Duration::from_millis(ms));
 }
 
+
 fn change_name(terminal: &mut TerminalHandler, ctx: &mut Ctx) -> Return {
-  terminal.root.clear();
-  terminal.refresh().unwrap();
-
   let name = terminal.handle_input(|handler, root| -> String {
-    let mut input_win = root.new_child(Window::default().size(50, 10));
+    root.clear();
+    handler.draw_window(&root).unwrap();
+    let mut input_win = root.new_child(Window::default().size(50, 10)).xy_rel(2, 2);
     let label = Text::default().text("new name: ").xy(0, 2);
-    let mut input = InputBox::default()
-                    .max_len(20)
-                    .position(label.x() + label.width(), label.y())
-                    .size(21, 1).start_text((0, 0));
+    let mut input = InputWindow::from(&mut input_win,
+                      Window::default()
+                      .xy(label.x() + label.width(), label.y())
+                      .size(21, 1))
+                      .start_text((0, 0)
+                    )
+                    .max_len(20);
 
-    input_win.set_xy_rel(2, 2);
     input_win.draw_element(&label);
     input_win.draw_text("Change Name", CenterH);
     input_win.render();
 
     handler.draw_window(&root).unwrap();
 
-    let new_name = input_win.read_string(&mut input, handler);
+    let new_name = input.read_string(handler);
     input_win.delete();
     new_name
   });
@@ -52,7 +54,6 @@ fn change_name(terminal: &mut TerminalHandler, ctx: &mut Ctx) -> Return {
   ctx.name = name;
   Return::None
 }
-
 
 struct Ctx {
   name: String
@@ -164,6 +165,19 @@ use super::*;
         _ => ()
       }
     }
+
+    execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
+    disable_raw_mode().unwrap();
+  }
+
+  #[test]
+  fn change_name_fn() {
+    enable_raw_mode().unwrap();
+    execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
+    let mut terminal = termin::root(CrosstermHandler::new(stdout()));
+    let mut game_ctx = Ctx { name: "Player".to_string() };
+
+    change_name(&mut terminal, &mut game_ctx);
 
     execute!(stdout(), cursor::Show, LeaveAlternateScreen).unwrap();
     disable_raw_mode().unwrap();

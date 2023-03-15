@@ -9,10 +9,11 @@ use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt, FutureExt};
 
 use crate::{termin::{terminal_window::TerminalHandler, window::{Window, Position, WindowRef}}, custom_elements::DialogBox, game::{board::EMPTY, socket::emit_json}, sleep};
-use super::{Game, socket::{WS, emit, SocketMsg}, board::{Side, WHITE}};
+use super::{Game, socket::{WS, emit, SocketMsg}, board::{Side, WHITE}, chat::ChatSection};
 
 #[derive(Debug)]
-pub struct OnlineGame {
+pub struct OnlineGame<'a> {
+  chat: ChatSection<'a>,
   opponent_name: String,
   my_side: Side,
   is_cur_turn: bool,
@@ -33,11 +34,23 @@ enum GameStatus {
   Continue
 }
 
-impl OnlineGame {
+enum Control {
+  Break,
+  Continue
+}
+
+impl <'a> OnlineGame<'a> {
   pub fn new(opponent_name: String, my_side: Side, terminal: &mut TerminalHandler) -> Self{
-    let online_win = terminal.root.new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
-    let game = Game::new(online_win.clone());
-    Self {opponent_name, my_side, is_opponent_online: false, is_cur_turn: false, online_win, game }
+    let mut online_win = terminal.root.new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
+    let game = Game::new(&mut online_win);
+    Self {
+      chat: ChatSection::new(&mut online_win),
+      opponent_name,
+      my_side,
+      is_opponent_online: false,
+      is_cur_turn: false,
+      online_win, game,
+    }
   }
 
   async fn get_game_state(&mut self, terminal: &mut TerminalHandler, dbox: &mut DialogBox, socket: &mut WS) {
@@ -121,7 +134,7 @@ impl OnlineGame {
     self.game.render_available_moves = false;
   }
 
-  fn play_move(&mut self) {
+  fn play_move_local(&mut self) {
     self.game.play_move();
     self.game.toggle_side();
     self.game.render_cur_turn_side();
@@ -139,7 +152,7 @@ impl OnlineGame {
       "opponent-move" => {
         let opponent_move: MoveDetails = msg.parse();
         self.game.board.move_cursor(opponent_move.colIdx, opponent_move.rowIdx);
-        self.play_move();
+        self.play_move_local();
         GameStatus::Continue
       },
       "game-over" => {
@@ -153,6 +166,53 @@ impl OnlineGame {
       },
       _ => GameStatus::Continue
     }
+  }
+
+  pub fn handle_game_over(&mut self, msg: String) {
+    if msg != "" {
+      self.game.render_game_over(&mut self.online_win, &msg);
+    } else {
+      self.game.render_game_over(&mut self.online_win, if self.game.is_game_draw() {
+        "Draw"
+      } else if self.my_side == WHITE {
+        if self.game.is_white_won() {
+          "you won :)"
+        } else {
+          "you lost :("
+        }
+      } else {
+        if self.game.is_white_won() {
+          "you lost :("
+        } else {
+          "you won :)"
+        }
+      });
+    }
+  }
+
+  async fn play_move(&mut self, terminal: &mut TerminalHandler, socket: &mut WS, dbox: &mut DialogBox) {
+    let (col_idx, row_idx) = self.game.board.cursor_xy();
+    let m = MoveDetails{colIdx: col_idx, rowIdx: row_idx};
+
+    self.play_move_local();
+    self.set_cur_turn_false();
+
+    self.game.render_board();
+    terminal.refresh().unwrap();
+
+    match emit_json!(socket, "move", m) {
+      Err(_) => {
+        dbox.error("connection lost :(");
+        terminal.root.draw_element(dbox);
+        terminal.refresh().unwrap();
+        terminal.getch();
+        return;
+      },
+      _=> ()
+    }
+  }
+
+  async fn handle_chat_mode_kbd(&mut self) {
   }
 
   pub async fn begin_game(&mut self, terminal: &mut TerminalHandler, mut socket: WS) {
@@ -172,47 +232,47 @@ impl OnlineGame {
     self.game.render_board();
     self.game.render_cur_turn_side();
     terminal.refresh().unwrap();
+    
+    enum WindowMode {
+      ChatMode,
+      GameMode
+    }
+    use WindowMode::*;
+
+    let mut cur_window_mode = GameMode;
 
     while !self.game.is_over {
       let mut event = EventStream::new();
 
       select! {
         e = event.next() => {
-          if e.is_none() || !self.is_cur_turn {
-            continue;
-          }
-
-          if let Some(k) = self.to_keycode(e) {
-            match k {
-              KeyCode::Enter => {
-                if !self.is_cur_turn {
-                  continue; 
-                }
-                let (col_idx, row_idx) = self.game.board.cursor_xy();
-                let m = MoveDetails{colIdx: col_idx, rowIdx: row_idx};
-
-                self.play_move();
-                self.set_cur_turn_false();
-
-                self.game.render_board();
-                terminal.refresh().unwrap();
-
-                match emit_json!(socket, "move", m) {
-                  Err(_) => {
-                    dbox.error("connection lost :(");
-                    terminal.root.draw_element(&dbox);
-                    terminal.refresh().unwrap();
-                    terminal.getch();
-                    return;
-                  },
-                  _=> ()
-                } 
-              },
-              _ => {
-                self.game.keyboard_event(k);
-                self.game.render_board();
-                terminal.refresh().unwrap();
+          match cur_window_mode {
+            GameMode => {
+              if e.is_none() || !self.is_cur_turn {
+                continue;
               }
+
+              if let Some(k) = self.to_keycode(e) {
+                match k {
+                  KeyCode::Char('c') => {
+                    cur_window_mode = ChatMode;
+                    continue;
+                  },
+                  KeyCode::Enter => {
+                    if !self.is_cur_turn {
+                      continue; 
+                    }
+                    self.play_move(terminal, &mut socket, &mut dbox).await;
+                  },
+                  _ => {
+                    self.game.keyboard_event(k);
+                    self.game.render_board();
+                    terminal.refresh().unwrap();
+                  }
+                }
+              }
+            },
+            ChatMode => {
             }
           }
         },
@@ -223,25 +283,7 @@ impl OnlineGame {
                   Message::Text(msg) => {
                     match self.handle_socket_msg(terminal, SocketMsg::from(msg)) {
                       GameStatus::GameOver(msg) => {
-                        if msg != "" {
-                          self.game.render_game_over(&mut self.online_win, &msg);
-                        } else {
-                          self.game.render_game_over(&mut self.online_win, if self.game.is_game_draw() {
-                            "Draw"
-                          } else if self.my_side == WHITE {
-                            if self.game.is_white_won() {
-                              "you won :)"
-                            } else {
-                              "you lost :("
-                            }
-                          } else {
-                            if self.game.is_white_won() {
-                              "you lost :("
-                            } else {
-                              "you won :)"
-                            }
-                          });
-                        }
+                        self.handle_game_over(msg);
                         terminal.refresh().unwrap();
                         terminal.getch();
                         break;
@@ -252,11 +294,11 @@ impl OnlineGame {
                       GameStatus::WaitForReconnect => {
                       }
                     }
-                  },
+                  }
                   _ => ()
               },
               Err(_) => ()
-            }
+            },
             None => ()
           }
         }

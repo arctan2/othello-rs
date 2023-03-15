@@ -31,7 +31,7 @@ impl Offline {
   pub fn begin_game(&self, terminal: &mut TerminalHandler) {
     terminal.clear();
     let mut offline_win = terminal.root.new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
-    let mut game = Game::new(offline_win.clone());
+    let mut game = Game::new(&mut offline_win);
     let mut cur_turn = self.black;
 
     game.init_board();

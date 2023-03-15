@@ -169,6 +169,7 @@ impl Buffer {
 
   pub fn get_mut(&mut self, x: u16, y: u16) -> &mut Cell {
     let idx = self.index_of(x, y);
+
     &mut self.content[idx]
   }
 

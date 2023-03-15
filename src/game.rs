@@ -4,6 +4,7 @@ mod online_game;
 pub mod online_lobby;
 pub mod macros;
 pub mod socket;
+mod chat;
 
 use std::io::Write;
 
@@ -25,7 +26,7 @@ pub struct Game {
 }
 
 impl Game {
-	pub fn new(mut win: WindowRef) -> Self {
+	pub fn new(win: &mut WindowRef) -> Self {
 		let (width, height) = (32 - 2, 15);
 		let mut board_container = win.new_child(
 			Window::default().size(width + 4, height + 2).bg(Color::Green).xy(1, 4)

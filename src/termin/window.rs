@@ -5,7 +5,7 @@ use crossterm::style::Color;
 use crate::sleep;
 
 use super::{
-  elements::{Element, InputBox, Text},
+  elements::{Element, Text, InputWindow},
   buffer::{Rect, Buffer, Cell}, crossterm_handler::CrosstermHandler
 };
 
@@ -42,7 +42,7 @@ impl Window {
 
   pub fn new(width: u16, height: u16, x: u16, y: u16) -> Self {
     Window {
-      buffer: Buffer::empty(Rect::new(x, y, width, height), Rect::new(x, y, width, height)),
+      buffer: Buffer::empty(Rect::new(x, y, width, height), Rect::new(0, 0, width, height)),
       sub_windows: vec![],
       parent: Weak::new(),
       id: 0
@@ -143,7 +143,8 @@ impl Window {
     let mut c = Cell::default();
     c.bg = self.buffer.get_bg();
     let r = Rect::new(self.buffer.left(), self.buffer.top(), width, height);
-    self.buffer = Buffer::filled(r, r, c);
+    let sr = Rect::new(0, 0, width, height);
+    self.buffer = Buffer::filled(r, sr, c);
   }
 
   pub fn draw_element(&mut self, el: &dyn Element) {
@@ -355,6 +356,11 @@ impl WindowRef {
     self.0.borrow()
   }
 
+  pub fn xy_rel(mut self, dx: i16, dy: i16) -> Self {
+    self.set_xy_rel(dx, dy);
+    self
+  }
+
   pub fn set_position(&mut self, pos: Position) {
     self.inner_mut().set_pos(pos);
   }
@@ -487,10 +493,6 @@ impl WindowRef {
 
   pub fn draw_text(&mut self, text: &str, pos: Position) {
     self.inner_mut().draw_text(text, pos);
-  }
-
-  pub fn read_string<W: Write>(&mut self, input_box: &mut InputBox, handler: &mut CrosstermHandler<W>) -> String {
-    input_box.read_string(self, handler)
   }
 }
 

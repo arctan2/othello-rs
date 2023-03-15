@@ -1,44 +1,48 @@
 use std::io::{Write, stdout};
 
 use copypasta::ClipboardProvider;
-use crossterm::{style::{Color, Attribute}, event::{KeyCode, Event, KeyEvent, KeyModifiers}, execute, cursor, queue};
+use crossterm::{event::{KeyCode, Event, KeyEvent, KeyModifiers}, execute, cursor, queue};
 
-use crate::termin::{buffer::{Rect, Buffer, Cell}, window::{WindowRef, Window, Position}, crossterm_handler::CrosstermHandler};
+use crate::{termin::{window::{WindowRef, Window}, crossterm_handler::CrosstermHandler}, sleep};
 
-use super::{Text, Element};
+use super::Text;
 
-#[derive(Debug)]
-pub struct InputBox {
+pub struct InputWindow {
   start_text: (u16, u16),
-  width: u16,
-  height: u16,
-  x: u16, y: u16,
   max_len: i32,
-  cursor: (u16, u16)
+  cursor_pos: usize,
+  input_win: WindowRef,
+  input_box: Text,
+  abs_x: u16, abs_y: u16,
+  rel_x: u16, rel_y: u16
 }
 
-impl Default for InputBox {
-  fn default() -> Self {
-    Self { start_text: (0, 0), cursor: (0, 0), max_len: 0, width: 0, height: 0, x: 0, y: 0 }
-  }
+pub enum EventResult {
+  Continue,
+  Return(String)
 }
 
-impl InputBox {
-  pub fn size(mut self, width: u16, height: u16) -> Self {
-    self.width = width;
-    self.height = height;
-    self
+impl InputWindow {
+  pub fn from(parent: &mut WindowRef, win: Window) -> Self {
+    let input_win = parent.new_child(win);
+    let input_box = Text::default().size(input_win.width(), input_win.height());
+
+    let (abs_y, abs_x) = input_win.abs_pos();
+
+    let mut iw = InputWindow {
+      start_text: (0, 0), max_len: 0, input_box, cursor_pos: 0, input_win, abs_x, abs_y, rel_x: 0, rel_y: 0,
+    };
+    iw.update_rel_xy();
+
+    return iw;
   }
 
-  pub fn position(mut self, x: u16, y: u16) -> Self {
-    self.x = x;
-    self.y = y;
-    self
+  pub fn show_cursor(&self) {
+    execute!(stdout(), cursor::Show).unwrap();
   }
 
-  pub fn max_len(mut self, max_len: i32) -> Self{
-    self.max_len = max_len;
-    self
+  pub fn hide_cursor(&self) {
+    execute!(stdout(), cursor::Hide).unwrap();
   }
 
   pub fn start_text(mut self, start_text: (u16, u16)) -> Self {
@@ -46,91 +50,108 @@ impl InputBox {
     self
   }
 
-  pub fn cursor_xy(&self, width: u16, idx: usize) -> (u16, u16) {
-    let idx = idx as u16;
-    (idx % width, idx / width)
+  pub fn update_rel_xy(&mut self) {
+    let width = self.input_win.width();
+    let idx = self.cursor_pos as u16;
+    self.rel_x = idx % width;
+    self.rel_y = idx / width;
   }
 
-  pub fn read_string<W: Write>(&mut self, win: &mut WindowRef, handler: &mut CrosstermHandler<W>) -> String {
-    execute!(stdout(), cursor::Show).unwrap();
-    let mut cursor_pos: usize = 0;
-    let mut input_win = win.new_child(
-      Window::default().xy(self.x, self.y).size(self.width, self.height)
-    );
-    let mut input_box = Text::default().size(self.width, self.height);
+  pub fn max_len(mut self, max_len: i32) -> Self{
+    self.max_len = max_len;
+    self
+  }
 
-    let (abs_y, abs_x) = input_win.abs_pos();
-
-    handler.draw_window(&input_win).unwrap();
-    let (rel_x, rel_y) = self.cursor_xy(input_win.width(), cursor_pos);
-    queue!(stdout(), cursor::MoveTo(abs_x + rel_x, abs_y + rel_y)).unwrap();
-    handler.flush().unwrap();
-
-    loop {
-      match handler.event() {
-        Event::Paste(s) => {
-          let len = s.len();
-          input_box.push_string(s);
-          if cursor_pos + len > self.max_len as usize{
-            input_box.chop_after(self.max_len as usize);
-            cursor_pos = self.max_len as usize;
-          } else {
-            cursor_pos += len as usize;
-          }
-        },
-        Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL, kind: _, state: _}) => {
-          let s = copypasta::ClipboardContext::new().unwrap().get_contents().unwrap();
-          let len = s.len();
-          input_box.push_string(s);
-          if cursor_pos + len as usize > self.max_len as usize{
-            input_box.chop_after(self.max_len as usize);
-            cursor_pos = self.max_len as usize;
-          } else {
-            cursor_pos += len as usize;
-          }
+  pub fn handle_event(&mut self, event: Event) -> EventResult {
+    match event {
+      Event::Paste(s) => {
+        let len = s.len();
+        self.input_box.push_string(s);
+        if self.cursor_pos + len > self.max_len as usize{
+          self.input_box.chop_after(self.max_len as usize);
+          self.cursor_pos = self.max_len as usize;
+        } else {
+          self.cursor_pos += len as usize;
         }
-        Event::Key(k) => {
-          match k.code {
-            KeyCode::Esc => {
-              execute!(stdout(), cursor::Hide).unwrap();
-              input_win.delete();
-              return input_box.get_text().to_string();
-            },
-            KeyCode::Enter => {
-              execute!(stdout(), cursor::Hide).unwrap();
-              input_win.delete();
-              return input_box.get_text().to_string();
-            },
-            KeyCode::Backspace => {
-              if cursor_pos > 0 {
-                cursor_pos -= 1;
-                input_box.remove_char_at(cursor_pos);
-              }
-            },
-            KeyCode::Char(ch) => {
-              if (input_box.get_text().len() as i32) < self.max_len {
-                input_box.add_char_at(cursor_pos, ch);
-                cursor_pos += 1;
-              }
-            },
-            KeyCode::Left => {
-              cursor_pos -= if cursor_pos != 0 { 1 } else { 0 };
-            },
-            KeyCode::Right => {
-              cursor_pos += if cursor_pos == input_box.get_text().len() { 0 } else { 1 };
-            },
-            _ => ()
-          }
-        },
+      },
+      Event::Key(KeyEvent{code: KeyCode::Char('v'), modifiers: KeyModifiers::CONTROL, kind: _, state: _}) => {
+        let s = copypasta::ClipboardContext::new().unwrap().get_contents().unwrap();
+        let len = s.len();
+        self.input_box.push_string(s);
+        if self.cursor_pos + len as usize > self.max_len as usize{
+          self.input_box.chop_after(self.max_len as usize);
+          self.cursor_pos = self.max_len as usize;
+        } else {
+          self.cursor_pos += len as usize;
+        }
+      },
+      Event::Key(k) => {
+        match k.code {
+          KeyCode::Esc => {
+            self.hide_cursor();
+            self.input_win.delete();
+            return EventResult::Return(self.input_box.get_text().to_string());
+          },
+          KeyCode::Enter => {
+            self.hide_cursor();
+            self.input_win.delete();
+            return EventResult::Return(self.input_box.get_text().to_string());
+          },
+          KeyCode::Backspace => {
+            if self.cursor_pos > 0 {
+              self.cursor_pos -= 1;
+              self.input_box.remove_char_at(self.cursor_pos);
+            }
+          },
+          KeyCode::Char(ch) => {
+            if (self.input_box.get_text().len() as i32) < self.max_len {
+              self.input_box.add_char_at(self.cursor_pos, ch);
+              self.cursor_pos += 1;
+            }
+          },
+          KeyCode::Left => {
+            self.cursor_pos -= if self.cursor_pos != 0 { 1 } else { 0 };
+          },
+          KeyCode::Right => {
+            self.cursor_pos += if self.cursor_pos == self.input_box.get_text().len() { 0 } else { 1 };
+          },
+          _ => ()
+        }
+      },
+      _ => ()
+    }
+
+    self.update_rel_xy();
+    return EventResult::Continue;
+  }
+
+  pub fn update_cursor(&self) {
+    queue!(stdout(), cursor::MoveTo(self.abs_x + self.rel_x, self.abs_y + self.rel_y)).unwrap();
+  }
+
+  pub fn render(&mut self) {
+    self.input_win.clear();
+    self.input_win.draw_element(&self.input_box);
+  }
+
+  pub fn input_win(&self) -> &WindowRef {
+    &self.input_win
+  }
+
+  pub fn read_string<W: Write>(&mut self, handler: &mut CrosstermHandler<W>) -> String {
+    self.show_cursor();
+    self.update_rel_xy();
+    self.update_cursor();
+    handler.flush().unwrap();
+    loop {
+      match self.handle_event(handler.event()) {
+        EventResult::Return(s) => return s,
         _ => ()
       }
+      self.render();
+      handler.draw_window(self.input_win()).unwrap();
 
-      input_win.clear();
-      input_win.draw_element(&input_box);
-      handler.draw_window(&input_win).unwrap();
-
-      let (rel_x, rel_y) = self.cursor_xy(input_win.width(), cursor_pos);
-      queue!(stdout(), cursor::MoveTo(abs_x + rel_x, abs_y + rel_y)).unwrap();
+      self.update_cursor();
       handler.flush().unwrap();
     }
   }
