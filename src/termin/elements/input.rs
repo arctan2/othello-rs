@@ -7,6 +7,7 @@ use crate::{termin::{window::{WindowRef, Window}, crossterm_handler::CrosstermHa
 
 use super::Text;
 
+#[derive(Debug)]
 pub struct InputWindow {
   start_text: (u16, u16),
   max_len: i32,
@@ -39,6 +40,10 @@ impl InputWindow {
 
   pub fn show_cursor(&self) {
     execute!(stdout(), cursor::Show).unwrap();
+  }
+
+  pub fn get_text(&self) -> &str {
+    self.input_box.get_text()
   }
 
   pub fn hide_cursor(&self) {
@@ -134,15 +139,29 @@ impl InputWindow {
     self.input_win.draw_element(&self.input_box);
   }
 
+  pub fn render_to_parent(&mut self) {
+    self.input_win.clear();
+    self.input_win.draw_element(&self.input_box);
+    self.input_win.render_to_parent();
+  }
+
   pub fn input_win(&self) -> &WindowRef {
     &self.input_win
   }
 
+  pub fn set_abs_xy(&mut self) {
+    let (abs_y, abs_x) = self.input_win.abs_pos();
+    self.abs_x = abs_x;
+    self.abs_y = abs_y;
+  }
+
   pub fn read_string<W: Write>(&mut self, handler: &mut CrosstermHandler<W>) -> String {
+    self.set_abs_xy();
     self.show_cursor();
     self.update_rel_xy();
     self.update_cursor();
     handler.flush().unwrap();
+
     loop {
       match self.handle_event(handler.event()) {
         EventResult::Return(s) => return s,

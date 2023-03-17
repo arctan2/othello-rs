@@ -2,23 +2,23 @@
 
 use std::io::Error;
 
-use crossterm::event::{EventStream, Event, KeyCode};
+use crossterm::{event::{EventStream, Event, KeyCode}, style::Color};
 use serde::{Deserialize, Serialize};
 use tokio::select;
 use tokio_tungstenite::tungstenite::Message;
 use futures_util::{SinkExt, StreamExt, FutureExt};
 
-use crate::{termin::{terminal_window::TerminalHandler, window::{Window, Position, WindowRef}}, custom_elements::DialogBox, game::{board::EMPTY, socket::emit_json}, sleep};
+use crate::{termin::{terminal_window::TerminalHandler, window::{Window, Position, WindowRef}, self}, custom_elements::DialogBox, game::{board::EMPTY, socket::emit_json, chat::ChatMsg}, sleep};
 use super::{Game, socket::{WS, emit, SocketMsg}, board::{Side, WHITE}, chat::ChatSection};
 
 #[derive(Debug)]
-pub struct OnlineGame<'a> {
-  chat: ChatSection<'a>,
+pub struct OnlineGame {
+  chat: ChatSection,
+  game: Game,
   opponent_name: String,
   my_side: Side,
   is_cur_turn: bool,
   is_opponent_online: bool,
-  game: Game,
   online_win: WindowRef
 }
 
@@ -39,7 +39,7 @@ enum Control {
   Continue
 }
 
-impl <'a> OnlineGame<'a> {
+impl OnlineGame {
   pub fn new(opponent_name: String, my_side: Side, terminal: &mut TerminalHandler) -> Self{
     let mut online_win = terminal.root.new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
     let game = Game::new(&mut online_win);
@@ -212,9 +212,6 @@ impl <'a> OnlineGame<'a> {
     }
   }
 
-  async fn handle_chat_mode_kbd(&mut self) {
-  }
-
   pub async fn begin_game(&mut self, terminal: &mut TerminalHandler, mut socket: WS) {
     let mut dbox = DialogBox::new(35, 5).position(terminal.root.rect(), Position::Coord(5, 5));
     terminal.clear();
@@ -240,29 +237,29 @@ impl <'a> OnlineGame<'a> {
     use WindowMode::*;
 
     let mut cur_window_mode = GameMode;
+    let mut event = EventStream::new();
 
     while !self.game.is_over {
-      let mut event = EventStream::new();
 
       select! {
         e = event.next() => {
           match cur_window_mode {
             GameMode => {
-              if e.is_none() || !self.is_cur_turn {
-                continue;
-              }
-
               if let Some(k) = self.to_keycode(e) {
                 match k {
                   KeyCode::Char('c') => {
+                    terminal.clear();
+                    self.chat.render();
+                    terminal.refresh().unwrap();
+                    self.chat.enable_cursor();
+                    terminal.flush().unwrap();
                     cur_window_mode = ChatMode;
                     continue;
                   },
                   KeyCode::Enter => {
-                    if !self.is_cur_turn {
-                      continue; 
+                    if self.is_cur_turn {
+                      self.play_move(terminal, &mut socket, &mut dbox).await;
                     }
-                    self.play_move(terminal, &mut socket, &mut dbox).await;
                   },
                   _ => {
                     self.game.keyboard_event(k);
@@ -273,6 +270,43 @@ impl <'a> OnlineGame<'a> {
               }
             },
             ChatMode => {
+              if let Some(e) = e {
+                if let Ok(e) = e {
+                  match e {
+                    Event::Key(k) => match k.code {
+                      KeyCode::Enter => {
+                        self.chat.push_chat_msg(ChatMsg::new("hehe", "obobobobobobobob", Color::Red));
+                        terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                      },
+                      KeyCode::Down => {
+                        self.chat.scroll_down();
+                        terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                      },
+                      KeyCode::Up => {
+                        self.chat.scroll_up();
+                        terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                      },
+                      KeyCode::Esc => {
+                        self.chat.disable_cursor();
+                        terminal.clear();
+                        self.game.render_board();
+                        self.game.render_cur_turn_side();
+                        terminal.refresh().unwrap();
+                        cur_window_mode = GameMode;
+                        continue;
+                      },
+                      _ => {
+                        self.chat.handle_kbd(e);
+                        self.chat.input_win.render();
+                        terminal.handler.draw_window(self.chat.input_win.input_win()).unwrap();
+                      }
+                    },
+                    _ => ()
+                  }
+                  self.chat.input_win.update_cursor();
+                  terminal.flush().unwrap();
+                }
+              }
             }
           }
         },

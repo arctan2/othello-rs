@@ -102,17 +102,27 @@ impl Buffer {
   }
 
   fn resize_content(&mut self) {
-    let a = self.scroll.area() as usize;
-    let mut s = self.content[0].clone();
-    s.bg = self.bg;
-    s.symbol = " ".to_string();
-    self.content = vec![s; a];
+    let area = self.scroll.area() as usize;
+    let mut cell = self.content[0].clone();
+    cell.bg = self.bg;
+    cell.symbol = " ".to_string();
+    self.content = vec![cell; area];
   }
 
   pub fn set_scroll_size(&mut self, width: u16, height: u16) {
     self.scroll.width = width;
     self.scroll.height = height;
     self.resize_content();
+  }
+
+  pub fn extend_scroll_height(&mut self, dy: u16) {
+    self.scroll.height += dy;
+
+    let area = self.scroll.area() as usize;
+    let mut cell = self.content[0].clone();
+    cell.bg = self.bg;
+    cell.symbol = " ".to_string();
+    self.content.append(&mut vec![cell; area]);
   }
 
   pub fn set_scroll_xy(&mut self, x: u16, y: u16) {

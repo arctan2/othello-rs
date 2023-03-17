@@ -27,11 +27,15 @@ impl <W: Write> Terminal<W> {
     self.handler.getch()
   }
 
-  pub fn refresh(&mut self) -> io::Result<()> {
+  pub fn render(&mut self) {
     match self.handler.draw(self.root.inner().buffer().to_vec((0, 0)).into_iter()) {
       Ok(()) => (),
       Err(_) => panic!("error while drawing the buffer")
     }
+  }
+
+  pub fn refresh(&mut self) -> io::Result<()> {
+    self.render();
     self.flush()
   }
 

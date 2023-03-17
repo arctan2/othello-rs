@@ -1,6 +1,7 @@
 use crossterm::style::{Color, Attribute};
 use super::{Buffer, Rect, Element, impl_setters, Position};
 
+#[derive(Debug)]
 pub struct Text {
   rect: Rect,
   fg: Color,

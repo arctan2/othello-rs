@@ -71,6 +71,10 @@ impl Window {
     }
   }
 
+  pub fn extend_scroll_height(&mut self, dy: u16) {
+    self.buffer.extend_scroll_height(dy);
+  }
+
   pub fn scoll_size(mut self, width: u16, height: u16) -> Self {
     self.set_scroll_size(width, height);
     self
@@ -428,6 +432,10 @@ impl WindowRef {
 
   pub fn abs_pos(&self) -> (u16, u16) {
     self.inner().abs_pos()
+  }
+
+  pub fn extend_scroll_height(&mut self, dy: u16) {
+    self.inner_mut().extend_scroll_height(dy);
   }
 
   pub fn size(mut self, width: u16, height: u16) -> Self {
