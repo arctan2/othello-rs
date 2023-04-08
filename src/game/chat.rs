@@ -1,11 +1,9 @@
-use std::io::stdout;
-
 use crossterm::{event::Event, style::Color, queue, execute, cursor::MoveTo};
 
 use crate::{
     sleep,
     termin::{
-        elements::{InputWindow, Text},
+        elements::{InputWindow, Text, Rectangle},
         terminal_window::TerminalHandler,
         window::{Position, Window, WindowRef},
     },
@@ -30,21 +28,47 @@ pub struct ChatSection {
     pub chat_msgs: WindowRef,
     pub recent_chat: WindowRef,
     pub input_win: InputWindow,
+    is_online: bool,
+    receiver_name: String,
     next_y_pos: u32,
 }
 
+enum MsgDir<'a> {
+    Send(&'a str),
+    Receive(&'a str)
+}
+
+impl<'a> MsgDir<'a> {
+    fn to_chat_msg(&self, name: &'a str) -> ChatMsg {
+        return match &self {
+            MsgDir::Send(msg) => ChatMsg::new(name, msg, Color::Blue),
+            MsgDir::Receive(msg) => ChatMsg::new(name, msg, Color::Red)
+        }
+    }
+}
+
 impl ChatSection {
-    pub fn new(win: &mut WindowRef) -> Self {
-        let mut chat_section = win.new_child(Window::default().size(50, 20).xy(0, 2));
-        let chat_msgs = chat_section.new_child(Window::default().size(50, 18).scoll_size(50, 100));
-        let recent_chat = win.new_child(Window::default().size(50, 1));
+    pub fn new(win: &mut WindowRef, receiver_name: String) -> Self {
+        let height = 22;
+        let width = 50;
+        let mut chat_section = win.new_child(Window::default().size(width, height).xy(0, 2));
+        let chat_msgs = chat_section.new_child(Window::default().size(width, height - 4).xy(0, 2).scoll_size(width, 100));
+        let recent_chat = win.new_child(Window::default().size(width, 1));
         let input_win = InputWindow::from(
             &mut chat_section,
-            Window::default().size(48, 1).xy(2, 19)
+            Window::default().size(width - 2, 1).xy(2, height - 1)
         )
-        .max_len(47);
+        .max_len((width - 3) as i32);
 
-        chat_section.draw_text(">", Position::Coord(0, 19));
+        chat_section.draw_text(">", Position::Coord(0, height - 1));
+        
+        let mut divider = String::new();
+        for _ in 0..chat_section.width() {
+            divider.push('_');
+        }
+
+        chat_section.draw_element(&Text::default().xy(3, 0).text(&receiver_name));
+        chat_section.draw_element(&Text::default().text(&divider).xy(0, 1));
 
         Self {
             chat_section,
@@ -52,7 +76,18 @@ impl ChatSection {
             chat_msgs,
             input_win,
             next_y_pos: 0,
+            receiver_name,
+            is_online: false
         }
+    }
+
+    fn draw_conn_status(&mut self, color: Color) {
+        self.chat_section.draw_element(&Rectangle::default().xy(0, 0).size(2, 1).bg(color));
+    }
+
+    pub fn set_recvr_is_online(&mut self, is_online: bool) {
+        self.is_online = is_online;
+        self.draw_conn_status(if is_online { Color::Green } else { Color::Red });
     }
 
     pub fn render(&mut self) {
@@ -61,7 +96,8 @@ impl ChatSection {
         self.chat_section.render();
     }
 
-    pub fn push_chat_msg(&mut self, msg: ChatMsg) {
+    fn push_chat_msg(&mut self, msg_dir: MsgDir) {
+        let msg = msg_dir.to_chat_msg(&self.receiver_name);
         let msg_text = ": ".to_string() + msg.msg;
         let msg_height = ((msg.name.len() + msg_text.len()) / self.chat_msgs.width() as usize + 1) as u32;
 
@@ -84,6 +120,14 @@ impl ChatSection {
         self.chat_msgs.draw_element(&msg);
 
         self.next_y_pos += msg_height as u32 + 1;
+    }
+
+    pub fn send<'a>(&mut self, msg: &'a str) {
+        self.push_chat_msg(MsgDir::Send(msg));
+    }
+
+    pub fn receive<'a>(&mut self, msg: &'a str) {
+        self.push_chat_msg(MsgDir::Receive(msg));
     }
 
     pub fn scroll_up(&mut self) {
@@ -135,7 +179,7 @@ mod tests {
         execute!(stdout(), EnterAlternateScreen, cursor::Hide).unwrap();
         let mut terminal = termin::root(CrosstermHandler::new(stdout()));
 
-        let mut chat_sec = ChatSection::new(&mut terminal.root);
+        let mut chat_sec = ChatSection::new(&mut terminal.root, String::from("test jinga boy"));
         chat_sec.render();
         terminal.refresh().unwrap();
 
@@ -148,11 +192,7 @@ mod tests {
             match e {
                 Event::Key(k) => match k.code {
                     KeyCode::Enter => {
-                        chat_sec.push_chat_msg(ChatMsg::new(
-                            "hehe",
-                            "obobobobobobobob",
-                            Color::Red,
-                        ));
+                        chat_sec.send("obobobobobobobob");
                         terminal.draw_window(&chat_sec.chat_msgs).unwrap();
                     }
                     KeyCode::Down => {

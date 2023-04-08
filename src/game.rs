@@ -36,10 +36,9 @@ impl Game {
             Window::default()
                 .size(width + 4, height + 2)
                 .bg(Color::Green)
-                .xy(1, 4),
+                .xy(2, 4),
         );
-        let board =
-            board_container.new_child(Window::default().size(32 - 2, 15).xy(2, 1).bg(Color::Green));
+        let board = board_container.new_child(Window::default().size(32 - 2, 15).xy(2, 1).bg(Color::Green));
         let points_win = win.new_child(
             Window::default()
                 .size(30, 1)

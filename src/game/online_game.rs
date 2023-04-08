@@ -32,7 +32,6 @@ use crate::{
 pub struct OnlineGame {
     chat: ChatSection,
     game: Game,
-    opponent_name: String,
     my_side: Side,
     is_cur_turn: bool,
     is_opponent_online: bool,
@@ -47,13 +46,17 @@ struct MoveDetails {
 
 enum GameStatus {
     GameOver(String),
+    ChatMsg,
     WaitForReconnect,
+    OpponentReconnect,
     Continue,
+    RefreshTerminal
 }
 
 enum Control {
     Break,
     Continue,
+    WaitForReconnect(bool)
 }
 
 #[derive(Copy, Clone)]
@@ -69,8 +72,7 @@ impl OnlineGame {
             .new_child(Window::default().size(terminal.root.width(), terminal.root.height()));
         let game = Game::new(&mut online_win);
         Self {
-            chat: ChatSection::new(&mut online_win),
-            opponent_name,
+            chat: ChatSection::new(&mut online_win, opponent_name),
             my_side,
             is_opponent_online: false,
             is_cur_turn: false,
@@ -136,6 +138,7 @@ impl OnlineGame {
         }
     }
 
+
     fn to_keycode(&self, e: Option<Result<Event, Error>>) -> Option<KeyCode> {
         match e {
             Some(e) => match e {
@@ -171,14 +174,12 @@ impl OnlineGame {
         self.game.render_cur_turn_side();
     }
 
-    fn handle_socket_msg(&mut self, cur_window_mode: WindowMode, terminal: &mut TerminalHandler, msg: SocketMsg) -> GameStatus {
+    fn handle_socket_msg(&mut self, msg: SocketMsg) -> GameStatus {
         match msg.event_name() {
             "cur-turn" => {
                 self.set_cur_turn_true();
-
                 self.game.render_board();
-                terminal.refresh().unwrap();
-                GameStatus::Continue
+                GameStatus::RefreshTerminal
             }
             "opponent-move" => {
                 let opponent_move: MoveDetails = msg.parse();
@@ -189,18 +190,12 @@ impl OnlineGame {
                 GameStatus::Continue
             }
             "game-over" => GameStatus::GameOver(msg.data),
-            "wait-for-opponent-reconnect" => GameStatus::WaitForReconnect,
             "chat-msg" => {
-                let msg: String = msg.parse();
-                self.chat.push_chat_msg(ChatMsg::new(&self.opponent_name, &msg, Color::Red));
-                if let WindowMode::ChatMode = cur_window_mode {
-                    terminal.draw_window(&self.chat.chat_msgs).unwrap();
-                    terminal.flush().unwrap();
-                    self.chat.input_win.update_rel_xy();
-                    self.chat.input_win.update_cursor();
-                }
-                GameStatus::Continue
+                self.chat.receive(msg.parse());
+                GameStatus::ChatMsg
             },
+            "wait-for-opponent-reconnect" => GameStatus::WaitForReconnect,
+            "opponent-reconnect" => GameStatus::OpponentReconnect,
             _ => GameStatus::Continue,
         }
     }
@@ -260,7 +255,166 @@ impl OnlineGame {
         }
     }
 
+    async fn handle_kb_ev(
+        &mut self,
+        e: Option<Result<Event, Error>>,
+        terminal: &mut TerminalHandler,
+        socket: &mut WS,
+        cur_window_mode: &mut WindowMode
+    ) -> Control {
+        use WindowMode::*;
+
+        let mut dbox = DialogBox::new(35, 5).position(terminal.root.rect(), Position::Coord(5, 5));
+        match cur_window_mode {
+            GameMode => {
+                if let Some(k) = self.to_keycode(e) {
+                    match k {
+                        KeyCode::Char('c') => {
+                            terminal.clear();
+                            self.chat.render();
+                            terminal.refresh().unwrap();
+                            self.chat.enable_cursor();
+                            terminal.flush().unwrap();
+                            *cur_window_mode = ChatMode;
+                        },
+                        KeyCode::Enter => {
+                            if self.is_cur_turn {
+                                self.play_move(terminal, socket, &mut dbox).await;
+                            }
+                        },
+                        KeyCode::Esc => {
+                            socket.close(None).await.unwrap();
+                            return Control::Break
+                        },
+                        _ => {
+                            self.game.keyboard_event(k);
+                            self.game.render_board();
+                            terminal.refresh().unwrap();
+                        }
+                    }
+                }
+            },
+
+            ChatMode => {
+                if let Some(e) = e {
+                    if let Ok(e) = e {
+                        match e {
+                            Event::Key(k) => match k.code {
+                                KeyCode::Enter => {
+                                    let msg = self.chat.input_win.get_text_clone();
+                                    if !msg.trim().is_empty() {
+                                        self.chat.send(&msg);
+                                        match emit!(socket, "chat-msg", &msg) {
+                                            Ok(()) => (),
+                                            Err(err) => {
+                                                dbox.error(err.as_str());
+                                                terminal.root.draw_element(&dbox);
+                                                terminal.refresh().unwrap();
+                                                terminal.getch();
+                                            }
+                                        }
+                                    }
+                                    self.chat.clear_input_win();
+                                    terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                                    terminal.draw_window(self.chat.input_win.input_win()).unwrap();
+                                },
+                                KeyCode::Down => {
+                                    self.chat.scroll_down();
+                                    terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                                },
+                                KeyCode::Up => {
+                                    self.chat.scroll_up();
+                                    terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                                },
+                                KeyCode::Esc => {
+                                    self.chat.disable_cursor();
+                                    terminal.clear();
+                                    self.game.render_board();
+                                    self.game.render_cur_turn_side();
+                                    terminal.refresh().unwrap();
+                                    *cur_window_mode = GameMode;
+                                },
+                                _ => {
+                                    self.chat.handle_kbd(e);
+                                    self.chat.input_win.render();
+                                    terminal.draw_window(self.chat.input_win.input_win()).unwrap();
+                                }
+                            },
+                            _ => ()
+                        }
+                        self.chat.input_win.update_cursor();
+                        terminal.flush().unwrap();
+                    }
+                }
+            }
+        }
+        return Control::Continue
+    }
+
+    fn handle_socket_ev(
+        &mut self,
+        socket_ev: Option<Result<Message, tokio_tungstenite::tungstenite::Error>>,
+        terminal: &mut TerminalHandler,
+        cur_window_mode: WindowMode
+    ) -> Control {
+        match socket_ev {
+            Some(maybe_msg) => match maybe_msg {
+                Ok(msg) => match msg {
+                    Message::Text(msg) => {
+                        match self.handle_socket_msg(SocketMsg::from(msg)) {
+                            GameStatus::GameOver(msg) => {
+                                self.handle_game_over(msg);
+                                terminal.refresh().unwrap();
+                                terminal.getch();
+                                return Control::Break
+                            },
+                            GameStatus::ChatMsg => {
+                                if let WindowMode::ChatMode = cur_window_mode {
+                                    terminal.draw_window(&self.chat.chat_msgs).unwrap();
+                                    terminal.flush().unwrap();
+                                    self.chat.input_win.update_rel_xy();
+                                    self.chat.input_win.update_cursor();
+                                }
+                            },
+                            GameStatus::WaitForReconnect => {
+                                self.chat.set_recvr_is_online(false);
+                                if let WindowMode::ChatMode = cur_window_mode {
+                                    terminal.draw_window(&self.chat.chat_section).unwrap();
+                                    terminal.flush().unwrap();
+                                    self.chat.input_win.update_rel_xy();
+                                    self.chat.input_win.update_cursor();
+                                }
+                                return Control::WaitForReconnect(true)
+                            },
+                            GameStatus::OpponentReconnect => {
+                                self.chat.set_recvr_is_online(true);
+                                if let WindowMode::ChatMode = cur_window_mode {
+                                    terminal.draw_window(&self.chat.chat_section).unwrap();
+                                    terminal.flush().unwrap();
+                                    self.chat.input_win.update_rel_xy();
+                                    self.chat.input_win.update_cursor();
+                                }
+                                return Control::WaitForReconnect(false)
+                            }
+                            GameStatus::RefreshTerminal => {
+                                terminal.refresh().unwrap();
+                            },
+                            GameStatus::Continue => {
+                                return Control::Continue
+                            }
+                        }
+                    }
+                    _ => ()
+                },
+                Err(_) => ()
+            },
+            None => ()
+        }
+        return Control::Continue
+    }
+
     pub async fn begin_game(&mut self, terminal: &mut TerminalHandler, mut socket: WS) {
+        self.chat.set_recvr_is_online(true);
         let mut dbox = DialogBox::new(35, 5).position(terminal.root.rect(), Position::Coord(5, 5));
         terminal.clear();
 
@@ -282,125 +436,79 @@ impl OnlineGame {
 
         let mut cur_window_mode = GameMode;
         let mut event = EventStream::new();
+        let mut wait_for_reconn = false;
+        let mut wait_for_reconn_win = self.online_win.new_child(
+            Window::default()
+            .size(40, 1)
+            .xy(0, 0)
+        );
+        let mut cur_wait_time = 20;
+
+        use tokio::time::{self, Instant, Duration};
+
+        let timer = time::sleep(Duration::from_millis(1000));
+        tokio::pin!(timer);
 
         while !self.game.is_over {
-            select! {
-                e = event.next() => {
-                    match cur_window_mode {
-                        GameMode => {
-                            if let Some(k) = self.to_keycode(e) {
-                                match k {
-                                    KeyCode::Char('c') => {
-                                        terminal.clear();
-                                        self.chat.render();
-                                        terminal.refresh().unwrap();
-                                        self.chat.enable_cursor();
-                                        terminal.flush().unwrap();
-                                        cur_window_mode = ChatMode;
-                                        continue;
-                                    },
-                                    KeyCode::Enter => {
-                                        if self.is_cur_turn {
-                                            self.play_move(terminal, &mut socket, &mut dbox).await;
-                                        }
-                                    },
-                                    KeyCode::Esc => {
-                                        socket.close(None).await.unwrap();
-                                        break
-                                    },
-                                    _ => {
-                                        self.game.keyboard_event(k);
-                                        self.game.render_board();
-                                        terminal.refresh().unwrap();
-                                    }
-                                }
+            if wait_for_reconn {
+                timer.as_mut().reset(Instant::now() + Duration::from_millis(1000));
+                select! {
+                    e = event.next() => {
+                        match self.handle_kb_ev(e, terminal, &mut socket, &mut cur_window_mode).await {
+                            Control::Break => break,
+                            _ => ()
+                        }
+                    },
+                    socket_ev = socket.next() => {
+                        match self.handle_socket_ev(socket_ev, terminal, cur_window_mode) {
+                            Control::Break => break,
+                            Control::WaitForReconnect(w) => {
+                                wait_for_reconn = w;
+                                cur_wait_time = 20;
+                                wait_for_reconn_win.clear();
+                                terminal.draw_window(&wait_for_reconn_win).unwrap();
+                                terminal.flush().unwrap();
                             }
-                        },
+                            _ => ()
+                        }
+                    },
+                    () = &mut timer => {
+                        if cur_wait_time == 9 {
+                            wait_for_reconn_win.clear();
+                        }
+                        if cur_wait_time != 0 {
+                            let t = &("waiting for opponent reconnection ".to_string() + &cur_wait_time.to_string());
+                            wait_for_reconn_win.draw_text(t, Position::Coord(0, 0));
+                            terminal.draw_window(&wait_for_reconn_win).unwrap();
+                            terminal.flush().unwrap();
+                        }
 
-                        ChatMode => {
-                            if let Some(e) = e {
-                                if let Ok(e) = e {
-                                    match e {
-                                        Event::Key(k) => match k.code {
-                                            KeyCode::Enter => {
-                                                let msg = self.chat.input_win.get_text_clone();
-                                                if !msg.trim().is_empty() {
-                                                    self.chat.push_chat_msg(ChatMsg::new("you", &msg, Color::Blue));
-                                                    match emit!(socket, "chat-msg", &msg) {
-                                                        Ok(()) => (),
-                                                        Err(err) => {
-                                                            dbox.error(err.as_str());
-                                                            terminal.root.draw_element(&dbox);
-                                                            terminal.refresh().unwrap();
-                                                            terminal.getch();
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                self.chat.clear_input_win();
-                                                terminal.draw_window(&self.chat.chat_msgs).unwrap();
-                                                terminal.draw_window(self.chat.input_win.input_win()).unwrap();
-                                            },
-                                            KeyCode::Down => {
-                                                self.chat.scroll_down();
-                                                terminal.draw_window(&self.chat.chat_msgs).unwrap();
-                                            },
-                                            KeyCode::Up => {
-                                                self.chat.scroll_up();
-                                                terminal.draw_window(&self.chat.chat_msgs).unwrap();
-                                            },
-                                            KeyCode::Esc => {
-                                                self.chat.disable_cursor();
-                                                terminal.clear();
-                                                self.game.render_board();
-                                                self.game.render_cur_turn_side();
-                                                terminal.refresh().unwrap();
-                                                cur_window_mode = GameMode;
-                                                continue;
-                                            },
-                                            _ => {
-                                                self.chat.handle_kbd(e);
-                                                self.chat.input_win.render();
-                                                terminal.draw_window(self.chat.input_win.input_win()).unwrap();
-                                            }
-                                        },
-                                        _ => ()
-                                    }
-                                    self.chat.input_win.update_cursor();
-                                    terminal.flush().unwrap();
-                                }
+                        if cur_wait_time == -10 {
+                            self.handle_game_over("connection was closed.".to_string());
+                            break
+                        }
+                        cur_wait_time -= 1;
+                    }
+                };
+            } else {
+                select! {
+                    e = event.next() => {
+                        match self.handle_kb_ev(e, terminal, &mut socket, &mut cur_window_mode).await {
+                            Control::Break => break,
+                            _ => ()
+                        }
+                    },
+                    socket_ev = socket.next() => {
+                        match self.handle_socket_ev(socket_ev, terminal, cur_window_mode) {
+                            Control::Break => break,
+                            Control::WaitForReconnect(w) => {
+                                wait_for_reconn = w;
                             }
+                            _ => ()
                         }
                     }
-                },
-
-                socket_ev = socket.next() => {
-                    match socket_ev {
-                        Some(maybe_msg) => match maybe_msg {
-                            Ok(msg) => match msg {
-                                Message::Text(msg) => {
-                                    match self.handle_socket_msg(cur_window_mode, terminal, SocketMsg::from(msg)) {
-                                        GameStatus::GameOver(msg) => {
-                                            self.handle_game_over(msg);
-                                            terminal.refresh().unwrap();
-                                            terminal.getch();
-                                            break;
-                                        },
-                                        GameStatus::Continue => {
-                                            continue
-                                        },
-                                        GameStatus::WaitForReconnect => {
-                                        }
-                                    }
-                                }
-                                _ => ()
-                            },
-                            Err(_) => ()
-                        },
-                        None => ()
-                    }
-                }
-            };
+                };
+            }
         }
 
         self.online_win.delete();
