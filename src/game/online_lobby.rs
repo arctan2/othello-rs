@@ -304,7 +304,7 @@ impl Online {
                                     terminal,
                                 );
 
-                                game.begin_game(terminal, socket).await;
+                                game.begin_game(socket).await;
                                 return;
                             }
                             NextGameState::Error(e) => {

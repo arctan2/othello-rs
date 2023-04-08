@@ -132,8 +132,8 @@ impl Game {
 
     pub fn render_game_over(&mut self, win: &mut WindowRef, msg: &str) {
         self.board.calc_points();
-        let mut border = win.new_child(Window::default().bg(Color::Green).size(24, 7).xy(6, 7));
-        let mut game_over_win = border.new_child(Window::default().size(20, 5));
+        let mut border = win.new_child(Window::default().bg(Color::Green).size(24, 8).xy(6, 7));
+        let mut game_over_win = border.new_child(Window::default().size(20, 6));
         let mut text_box = Text::default()
             .text("Game Over")
             .position(game_over_win.rect(), Position::CenterH);
@@ -153,8 +153,10 @@ impl Game {
         } else {
             text_box.set_text(msg);
         }
-        text_box.width_fit();
-        text_box.set_xy_rel(0, 2);
+
+        text_box.set_size(game_over_win.width() - 2, 2);
+        text_box.set_xy_rel(1, 2);
+        text_box.set_position(game_over_win.rect(), Position::CenterH);
         game_over_win.draw_element(&text_box);
 
         game_over_win.render_to_parent();

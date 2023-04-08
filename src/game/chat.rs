@@ -53,7 +53,7 @@ impl ChatSection {
         let width = 50;
         let mut chat_section = win.new_child(Window::default().size(width, height).xy(0, 2));
         let chat_msgs = chat_section.new_child(Window::default().size(width, height - 4).xy(0, 2).scoll_size(width, 100));
-        let recent_chat = win.new_child(Window::default().size(width, 1));
+        let recent_chat = win.new_child(Window::default().size(width, 2).xy(1, 25));
         let input_win = InputWindow::from(
             &mut chat_section,
             Window::default().size(width - 2, 1).xy(2, height - 1)
@@ -105,12 +105,12 @@ impl ChatSection {
             self.chat_msgs.extend_scroll_height(50);
         }
 
-        let name = Text::default()
+        let mut name = Text::default()
             .text(msg.name)
             .size(msg.name.len() as u32, 1)
             .xy(0, self.next_y_pos as u32)
             .fg(msg.name_fg);
-        let msg = Text::default()
+        let mut msg = Text::default()
             .text(&msg_text)
             .start_text((msg.name.len() as u32, 0))
             .size(self.chat_msgs.width(), msg_height)
@@ -118,6 +118,12 @@ impl ChatSection {
 
         self.chat_msgs.draw_element(&name);
         self.chat_msgs.draw_element(&msg);
+
+        name.set_xy(0, 0);
+        msg.set_xy(0, 0);
+        self.recent_chat.clear();
+        self.recent_chat.draw_element(&name);
+        self.recent_chat.draw_element(&msg);
 
         self.next_y_pos += msg_height as u32 + 1;
     }
