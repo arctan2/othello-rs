@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
+use std::io::Error;
+
 use copypasta::{ClipboardContext, ClipboardProvider};
-use crossterm::style::Color;
+use crossterm::{style::Color, event::{EventStream, KeyCode, Event}};
 use futures_util::{stream::StreamExt, SinkExt};
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
@@ -54,9 +56,24 @@ struct Lobby {
     game_status_win: WindowRef,
 }
 
+const HLINK: &str = "https://othellojs.onrender.com";
+const WLINK: &str = "wss://othellojs.onrender.com";
+
+macro_rules! api_link {
+    ($post:expr) => { &(HLINK.to_string() + $post) };
+    ($pre:literal, $post:expr) => {
+        if $pre == "w" {
+            WLINK.to_string() + $post
+        } else {
+            HLINK.to_string() + $post
+        }
+    }
+}
+
 impl Lobby {
     fn new(win: &mut WindowRef) -> Self {
         let mut lobby_win = win.new_child(Window::default().size(50, 15));
+        lobby_win.set_position(Position::CenterB);
         Self {
             name: "".to_string(),
             white_name: "".to_string(),
@@ -68,6 +85,8 @@ impl Lobby {
     }
 
     fn render(&mut self, terminal: &mut TerminalHandler) {
+        terminal.clear();
+        terminal.refresh().unwrap();
         self.lobby_win.clear();
         let mut wrect = Rectangle::default().bg(Color::White).size(6, 3);
         let mut brect = Rectangle::default().bg(Color::Black).size(6, 3);
@@ -117,7 +136,7 @@ struct PlayerInfo {
 enum NextGameState {
     StartGame,
     Error(String),
-    Continue,
+    Continue
 }
 
 impl Online {
@@ -149,7 +168,7 @@ impl Online {
         let req = reqwest::blocking::Client::new();
 
         let res = req
-            .post("http://localhost:5000/api/create-lobby")
+            .post(api_link!("/api/create-lobby"))
             .json(&host)
             .send();
 
@@ -173,7 +192,7 @@ impl Online {
     }
 
     async fn connect_socket(&mut self) -> Result<WS, String> {
-        let url_str = "ws://localhost:5000/api/join-game/".to_string() + &self.game_id;
+        let url_str = api_link!("w", &("/api/join-game/".to_string() + &self.game_id));
         match tokio_tungstenite::connect_async(Url::parse(&url_str).unwrap()).await {
             Ok((socket, res)) => {
                 if res.status() != StatusCode::SWITCHING_PROTOCOLS {
@@ -186,7 +205,7 @@ impl Online {
     }
 
     fn copy_link_to_clipboard(&self) {
-        let url_str = "http://localhost:5000/api/join-game/".to_string() + &self.game_id;
+        let url_str = api_link!(&("/join-game/".to_string() + &self.game_id));
         ClipboardContext::new()
             .unwrap()
             .set_contents(String::from(url_str).to_owned())
@@ -203,7 +222,7 @@ impl Online {
         match msg.event_name() {
             "game-verified" => {
                 if !msg.parse::<bool>() {
-                    return NextGameState::Error("game not fount :(".to_string());
+                    return NextGameState::Error("game not found :(".to_string());
                 } else {
                     let player_info = PlayerInfo {
                         playerName: self.player_name.clone(),
@@ -256,8 +275,8 @@ impl Online {
             }
             "countdown-begin" => {
                 self.lobby.game_status_win.clear();
-
-                for i in (0..=2).rev() {
+                sleep(1000);
+                for i in (0..=5).rev() {
                     let t = "Game will start in ".to_string() + &i.to_string();
                     self.lobby
                         .game_status_win
@@ -273,57 +292,79 @@ impl Online {
         NextGameState::Continue
     }
 
+    fn to_keycode(&self, e: Option<Result<Event, Error>>) -> Option<KeyCode> {
+        match e {
+            Some(e) => match e {
+                Ok(e) => match e {
+                    Event::Key(e) => Some(e.code),
+                    _ => None,
+                },
+                Err(_) => None,
+            },
+            None => None,
+        }
+    }
+
     async fn join_lobby(&mut self, mut socket: WS, terminal: &mut TerminalHandler) {
         terminal.clear();
         let mut dbox = DialogBox::new(35, 5)
             .position(terminal.root.rect(), Position::Coord(5, 5))
             .text("");
+        let mut event = EventStream::new();
 
         loop {
-            let msg = socket.next().await.unwrap();
-            match msg {
-                Ok(msg) => match msg {
-                    Message::Text(t) => {
-                        let msg = SocketMsg::from(t);
-                        match self
-                            .handle_lobby_socket(&mut socket, msg, &mut dbox, terminal)
-                            .await
-                        {
-                            NextGameState::Continue => continue,
-                            NextGameState::StartGame => {
-                                self.lobby.game_status_win.delete();
-                                self.lobby.lobby_win.delete();
-
-                                let mut game = OnlineGame::new(
-                                    if self.side == 'w' {
-                                        self.lobby.black_name.clone()
-                                    } else {
-                                        self.lobby.white_name.clone()
-                                    },
-                                    self.side,
-                                    terminal,
-                                );
-
-                                game.begin_game(socket).await;
-                                return;
-                            }
-                            NextGameState::Error(e) => {
-                                dbox.error(&e);
-                                terminal.root.draw_element(&dbox);
-                                terminal.refresh().unwrap();
-                                terminal.getch();
-                                return;
-                            }
+            tokio::select!{
+                e = event.next() => {
+                    if let Some(k) = self.to_keycode(e) {
+                        match k {
+                            KeyCode::Esc => {
+                                socket.close(None).await.unwrap();
+                                return
+                            },
+                            _ => ()
                         }
                     }
-                    _ => (),
                 },
-                Err(e) => {
-                    dbox.error(&e.to_string());
-                    terminal.root.draw_element(&dbox);
-                    terminal.refresh().unwrap();
-                    terminal.getch();
-                    return;
+                socket_ev = socket.next() => {
+                    match socket_ev {
+                        Some(maybe_msg) => match maybe_msg {
+                            Ok(msg) => match msg {
+                                Message::Text(msg) => {
+                                    match self.handle_lobby_socket(&mut socket, SocketMsg::from(msg), &mut dbox, terminal).await {
+                                        NextGameState::Continue => continue,
+                                        NextGameState::StartGame => {
+                                            std::mem::drop(event); 
+                                            self.lobby.game_status_win.delete();
+                                            self.lobby.lobby_win.delete();
+
+                                            let mut game = OnlineGame::new(
+                                                if self.side == 'w' {
+                                                    self.lobby.black_name.clone()
+                                                } else {
+                                                    self.lobby.white_name.clone()
+                                                },
+                                                self.side,
+                                                terminal,
+                                            );
+
+                                            game.begin_game(socket).await;
+                                            return;
+                                        }
+                                        NextGameState::Error(e) => {
+                                            dbox.error(&e);
+                                            terminal.root.draw_element(&dbox);
+                                            terminal.refresh().unwrap();
+                                            terminal.getch();
+                                            return;
+                                        }
+                                    }
+                                }
+                                _ => ()
+                            },
+                            Err(_) => ()
+                        },
+                        None => ()
+                    }
                 }
             }
         }
@@ -362,7 +403,7 @@ impl Online {
                     .size(25, 3),
             )
             .start_text((0, 0))
-            .max_len(60);
+            .max_len(65);
 
             input_win.set_xy_rel(2, 2);
             input_win.draw_element(&label);
@@ -433,9 +474,9 @@ impl Online {
         }
 
         let req = reqwest::blocking::Client::new();
-        let link = "http://localhost:5000/api/game-info/".to_string() + &self.game_id;
+        let link = api_link!(&("/api/game-info/".to_string() + &self.game_id));
 
-        let res = req.post(link).send();
+        let res = req.get(link).send();
 
         match res {
             Ok(res) => {
@@ -452,10 +493,10 @@ impl Online {
                                 return Ok(true);
                             }
                         }
-                    }
+                    },
                     Err(e) => return Err(e.to_string()),
                 }
-            }
+            },
             Err(e) => return Err(e.to_string()),
         }
     }

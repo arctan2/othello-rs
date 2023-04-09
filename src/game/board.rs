@@ -109,10 +109,10 @@ impl Board {
         let mut text_box = Text::default();
         self.points_win.clear();
 
-        text_box.set_text(&("white: ".to_string() + &self.white_points.to_string()));
+        text_box.set_text(&("black: ".to_string() + &self.black_points.to_string()));
         self.points_win.draw_element(&text_box);
         text_box.set_xy_rel(15, 0);
-        text_box.set_text(&("black: ".to_string() + &self.black_points.to_string()));
+        text_box.set_text(&("white: ".to_string() + &self.white_points.to_string()));
         text_box.width_fit();
         self.points_win.draw_element(&text_box);
 

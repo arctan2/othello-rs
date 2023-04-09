@@ -297,7 +297,7 @@ impl<'a> OnlineGame<'a> {
         &mut self,
         e: Option<Result<Event, Error>>,
         socket: &mut WS,
-    ) -> Control {
+    ) -> bool {
         let mut dbox = DialogBox::new(35, 5).position(self.terminal.root.rect(), Position::Coord(5, 5));
         match self.cur_window_mode {
             WindowMode::GameMode => {
@@ -313,7 +313,7 @@ impl<'a> OnlineGame<'a> {
                         },
                         KeyCode::Esc => {
                             socket.close(None).await.unwrap();
-                            return Control::Break
+                            return true
                         },
                         _ => {
                             self.game.keyboard_event(k);
@@ -372,13 +372,13 @@ impl<'a> OnlineGame<'a> {
                 }
             }
         }
-        return Control::Continue
+        return false
     }
 
     fn handle_socket_ev(
         &mut self,
         socket_ev: Option<Result<Message, tokio_tungstenite::tungstenite::Error>>,
-    ) -> Control {
+    ) -> bool {
         match socket_ev {
             Some(maybe_msg) => match maybe_msg {
                 Ok(msg) => match msg {
@@ -388,7 +388,7 @@ impl<'a> OnlineGame<'a> {
                                 self.handle_game_over(msg);
                                 self.terminal.refresh().unwrap();
                                 self.terminal.getch();
-                                return Control::Break
+                                return true
                             },
                             GameStatus::ChatMsg => {
                                 if let WindowMode::ChatMode = self.cur_window_mode {
@@ -405,12 +405,14 @@ impl<'a> OnlineGame<'a> {
                             GameStatus::WaitForReconnect => {
                                 self.chat.set_recvr_is_online(false);
                                 if let WindowMode::ChatMode = self.cur_window_mode {
+                                    self.chat.chat_msgs.render_to_parent();
+                                    self.chat.chat_section.render();
                                     self.terminal.draw_window(&self.chat.chat_section).unwrap();
                                     self.terminal.flush().unwrap();
                                     self.chat.input_win.update_rel_xy();
                                     self.chat.input_win.update_cursor();
                                 }
-                                return Control::WaitForReconnect(true)
+                                self.reconn_info.is_waiting = true;
                             },
                             GameStatus::OpponentReconnect => {
                                 self.chat.set_recvr_is_online(true);
@@ -420,13 +422,17 @@ impl<'a> OnlineGame<'a> {
                                     self.chat.input_win.update_rel_xy();
                                     self.chat.input_win.update_cursor();
                                 }
-                                return Control::WaitForReconnect(false)
+                                self.reconn_info.is_waiting = false;
+                                self.reconn_info.cur_wait_time = 20;
+                                self.reconn_info.win.clear();
+                                self.terminal.draw_window(&self.reconn_info.win).unwrap();
+                                self.terminal.flush().unwrap();
                             }
                             GameStatus::RefreshTerminal => {
                                 self.terminal.refresh().unwrap();
                             },
                             GameStatus::Continue => {
-                                return Control::Continue
+                                return false
                             }
                         }
                     }
@@ -437,7 +443,7 @@ impl<'a> OnlineGame<'a> {
             None => ()
         }
 
-        return Control::Continue
+        return false
     }
 
     pub async fn begin_game(&mut self, mut socket: WS) {
@@ -492,40 +498,26 @@ impl<'a> OnlineGame<'a> {
                         timer.as_mut().reset(Instant::now() + Duration::from_millis(1000));
                     }
                     e = event.next() => {
-                        match self.handle_kb_ev(e, &mut socket).await {
-                            Control::Break => break,
-                            _ => ()
+                        if self.handle_kb_ev(e, &mut socket).await {
+                            break
                         }
                     },
                     socket_ev = socket.next() => {
-                        match self.handle_socket_ev(socket_ev) {
-                            Control::Break => break,
-                            Control::WaitForReconnect(w) => {
-                                self.reconn_info.is_waiting = w;
-                                self.reconn_info.cur_wait_time = 20;
-                                self.reconn_info.win.clear();
-                                self.terminal.draw_window(&self.reconn_info.win).unwrap();
-                                self.terminal.flush().unwrap();
-                            }
-                            _ => ()
+                        if self.handle_socket_ev(socket_ev) {
+                            break
                         }
                     },
                 };
             } else {
                 select! {
                     e = event.next() => {
-                        match self.handle_kb_ev(e, &mut socket).await {
-                            Control::Break => break,
-                            _ => ()
+                        if self.handle_kb_ev(e, &mut socket).await {
+                            break
                         }
                     },
                     socket_ev = socket.next() => {
-                        match self.handle_socket_ev(socket_ev) {
-                            Control::Break => break,
-                            Control::WaitForReconnect(w) => {
-                                self.reconn_info.is_waiting = w;
-                            }
-                            _ => ()
+                        if self.handle_socket_ev(socket_ev) {
+                            break
                         }
                     }
                 };

@@ -99,12 +99,12 @@ macro_rules! render_seq {
   };
   ($win:expr,{x: $x:expr,y: $y:expr, gap: $gap:expr},$first:expr,$($el:expr),+) => {
     $first.set_xy($x, $y);
-    let (mut prev_left, mut prev_bottom) = ($first.x(), $first.height() + $first.y() + $gap);
+    let (mut _prev_left, mut _prev_bottom) = ($first.x(), $first.height() + $first.y() + $gap);
     $win.render_element(&$first);
     $(
-      $el.set_xy(prev_left, prev_bottom);
+      $el.set_xy(_prev_left, _prev_bottom);
       $win.draw_element(&$el);
-      (prev_left, prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
+      (_prev_left, _prev_bottom) = ($el.x(), $el.height() + $el.y() + $gap);
     )+
   };
 }
